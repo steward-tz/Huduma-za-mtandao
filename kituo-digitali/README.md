@@ -1,55 +1,49 @@
-# Kituo Digitali
+# HUDUMA ZA MTANDAONI
 
-Kituo Digitali is an original full-stack digital workbench inspired by the information architecture of a service hub. It is intentionally not a copy of the supplied reference: it uses its own name, visual language, copy, iconography, and sample data.
+HUDUMA ZA MTANDAONI ni full-stack web application ya Kiswahili inayokusanya huduma za kidigitali, mfumo wa tokeni, mafunzo, historia ya matumizi na paneli ya admin katika portal moja ya mobile-first.
+
+## Kilichojengwa
+
+- Muonekano wa mobile-first unaofanya kazi kwenye Android, iPhone, tablet na desktop.
+- Banner nyekundu ya tangazo, search ya huduma, white cards, vitufe vya kijani, VIP cards za njano na matangazo mekundu.
+- Huduma kuu: TIN, NIDA, LIPA, mpiga kura, leseni, BRELA na nyingine.
+- Huduma za bure ambazo hazikati tokeni.
+- Huduma zilizofungwa zenye ujumbe wa wazi bila kukata tokeni.
+- Huduma maalum za WhatsApp, VIP na matangazo ya biashara.
+- Video za mafunzo zilizoandaliwa kwa URL halisi inayoweza kuongezwa na admin; hakuna video URL bandia.
+- Mfumo wa tokeni wa backend: akaunti mpya huanza na tokeni 0, huduma zinazolipiwa hukata tokeni 2, na huduma za bure hukata 0.
+- Ulinzi wa verification status, token balance, transaction history, service usage, notifications na audit actions.
+- Admin dashboard yenye route za `/admin`, `/admin/users`, `/admin/tokens`, `/admin/services`, `/admin/videos`, `/admin/transactions`, `/admin/announcements` na `/admin/settings`.
+- OAuth ya Manus ndiyo authentication provider ya msingi; kuingia mara ya kwanza hufanya kazi kama usajili wa akaunti. Admin ndiye huidhinisha akaunti kabla ya huduma za kulipia kutumika.
 
 ## Stack
 
-- React 19 + TypeScript + Vite
-- Tailwind CSS 4 with an authored CSS design system
-- Express + tRPC 11 for typed server procedures
-- Drizzle ORM + MySQL/TiDB for persisted service runs
-- Built-in Manus OAuth for authentication
-- Vitest for backend contract tests
+- React 19 + Vite + Tailwind 4
+- Express + tRPC 11
+- Drizzle ORM + MySQL/TiDB
+- Manus OAuth na protected/admin procedures
+- Vitest kwa backend contract tests
 
-## Product structure
-
-- `/` — overview dashboard with hero, balance, service cards, search, and next-step prompt
-- `/services` — filterable service library with detail modal
-- `/workbench` — structured service brief form backed by `workItems.create`
-- `/history` — persisted or seeded activity history
-- `/account` — account, privacy, and credit usage settings
-
-## Local development
+## Kuendesha locally
 
 ```bash
 pnpm install
 pnpm dev
-```
-
-Useful checks:
-
-```bash
 pnpm check
 pnpm test
 pnpm build
 ```
 
-The application uses the environment variables supplied by the full-stack template. Do not commit `.env` files or secrets.
+Usiweke `.env` au API keys kwenye GitHub. Environment variables hutolewa na runtime ya Manus/WebDev au setup yako binafsi ya deployment.
 
-## Where to edit
+## Backend flow
 
-- `client/src/pages/Home.tsx` — page composition, navigation, forms, and interaction states
-- `client/src/index.css` — global tokens, responsive layout, and component styling
-- `shared/catalog.ts` — original service catalog and seeded activity
-- `server/routers.ts` — typed tRPC API contracts
-- `server/db.ts` — Drizzle query helpers
-- `drizzle/schema.ts` — database schema
-- `docs/reference-analysis.md` — reference analysis and deliberate divergence notes
+`drizzle/schema.ts` ina tables za users, services, service runs, token transactions, service usage, tutorial videos, notifications, announcements na admin actions. `server/db.ts` ndiyo layer ya database. `server/routers.ts` ndiyo contract ya tRPC. Deduction ya tokeni hufanyika server-side ndani ya transaction na ina audit reference.
 
-## GitHub source of truth
+## Kupanua mfumo
 
-The repository is intended to be the canonical editable source. Keep feature work in GitHub branches and use pull requests for review. The Manus preview is a development and verification environment, not the only place the source lives.
+Ongeza huduma mpya kwenye `shared/catalog.ts`, kisha ongeza action URL halisi au procedure inayohitajika kwenye backend. Kwa video, tumia URL halisi inayodhibitiwa na admin. Kwa malipo, tumia provider halisi na usionyeshe mafanikio ya malipo kabla provider hajathibitisha transaction.
 
-## Notes
+## Footer
 
-The starter service runs are intentionally safe demo records. Connect a real service implementation behind the existing `workItems.create` procedure when product behavior is ready to move beyond the prototype.
+Programu hii ilitengenezwa na Bw. Zoom Cotex Limited.

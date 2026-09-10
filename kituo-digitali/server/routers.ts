@@ -1,10 +1,24 @@
 import { z } from "zod";
-import { serviceCatalog, activitySeed, findService } from "../shared/catalog";
+import { activitySeed, announcementText, findService, serviceCatalog, tutorials } from "../shared/catalog";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
-import { createServiceRun, getRecentServiceRuns } from "./db";
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import {
+  adjustTokens,
+  consumeTokens,
+  createServiceRun,
+  getAnnouncement,
+  getNotifications,
+  getProfile,
+  getRecentServiceRuns,
+  getTokenTransactions,
+  getTutorialVideos,
+  listAdminStats,
+  listUsers,
+  updateUserVerification,
+} from "./db";
+import { TRPCError } from "@trpc/server";
 
 export const appRouter = router({
   system: systemRouter,
@@ -16,40 +30,45 @@ export const appRouter = router({
       return { success: true } as const;
     }),
   }),
-  services: router({
-    list: publicProcedure.query(() => serviceCatalog),
-    getBySlug: publicProcedure.input(z.object({ slug: z.string() })).query(({ input }) => findService(input.slug) ?? null),
-  }),
-  activity: router({
-    recent: publicProcedure.query(async () => {
-      const stored = await getRecentServiceRuns();
-      return stored.length > 0
-        ? stored.map((run) => ({
-            service: run.serviceName,
-            type: "Kazi ya kituo",
-            credits: run.credits,
-            status: run.status,
-            reference: run.reference,
-            createdAt: run.createdAt.toISOString(),
-          }))
-        : activitySeed;
+  portal: router({
+    announcement: publicProcedure.query(async () => (await getAnnouncement())?.message ?? announcementText),
+    services: publicProcedure.query(() => serviceCatalog),
+    tutorials: publicProcedure.query(async () => {
+      const stored = await getTutorialVideos();
+      return stored.length ? stored : tutorials;
     }),
-  }),
-  workItems: router({
-    create: publicProcedure.input(z.object({ serviceSlug: z.string(), brief: z.string().min(3).max(5000) })).mutation(async ({ input }) => {
+    profile: protectedProcedure.query(async ({ ctx }) => {
+      const stored = await getProfile(ctx.user.id);
+      return stored ?? { ...ctx.user, phone: null, verificationStatus: "pending", tokenBalance: 0 };
+    }),
+    notifications: protectedProcedure.query(({ ctx }) => getNotifications(ctx.user.id)),
+    tokenHistory: protectedProcedure.query(({ ctx }) => getTokenTransactions(ctx.user.id)),
+    activity: protectedProcedure.query(async ({ ctx }) => {
+      const stored = await getRecentServiceRuns(ctx.user.id);
+      return stored.length ? stored.map((run) => ({ service: run.serviceName, type: "Matumizi ya huduma", credits: run.credits, status: run.status, reference: run.reference, createdAt: run.createdAt })) : activitySeed;
+    }),
+    useService: protectedProcedure.input(z.object({ serviceSlug: z.string(), brief: z.string().max(5000).optional() })).mutation(async ({ ctx, input }) => {
       const service = findService(input.serviceSlug);
-      if (!service) throw new Error("That service is not available.");
-      const reference = `KD-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-      const created = await createServiceRun({
-        serviceSlug: service.slug,
-        serviceName: service.name,
-        brief: input.brief,
-        credits: service.credits,
-        status: "Imekamilika",
-        reference,
-      });
-      return { reference: created?.reference ?? reference, service: service.name };
+      if (!service) throw new TRPCError({ code: "NOT_FOUND", message: "Huduma haijapatikana." });
+      if (service.kind === "locked") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Huduma hii imefungwa kwa sasa." });
+      const cost = service.tokenCost;
+      if (cost > 0) {
+        const result = await consumeTokens({ userId: ctx.user.id, serviceSlug: service.slug, serviceName: service.name, cost, description: `Matumizi ya ${service.name}` });
+        if (result.reason === "unverified") throw new TRPCError({ code: "FORBIDDEN", message: "Akaunti yako haijathibitishwa na admin. Tafadhali wasiliana na admin." });
+        if (result.reason === "insufficient") throw new TRPCError({ code: "FORBIDDEN", message: "Huna tokeni za kutosha. Tafadhali nunua tokeni." });
+        if (result.reason === "database") throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Hifadhidata haipatikani kwa sasa." });
+      }
+      const reference = `HM-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      await createServiceRun({ userId: ctx.user.id, serviceSlug: service.slug, serviceName: service.name, brief: input.brief ?? "Matumizi kupitia portal ya HUDUMA ZA MTANDAONI", credits: cost, status: "Imekamilika", reference });
+      return { ok: true, reference, service: service.name, cost };
     }),
+  }),
+  admin: router({
+    stats: adminProcedure.query(() => listAdminStats()),
+    users: adminProcedure.query(() => listUsers()),
+    verifyUser: adminProcedure.input(z.object({ userId: z.number(), status: z.enum(["approved", "rejected", "blocked", "pending"]) })).mutation(({ ctx, input }) => updateUserVerification(ctx.user.id, input.userId, input.status)),
+    adjustTokens: adminProcedure.input(z.object({ userId: z.number(), amount: z.number().int().min(-100000).max(100000), description: z.string().min(3).max(300) })).mutation(({ ctx, input }) => adjustTokens({ adminUserId: ctx.user.id, userId: input.userId, amount: input.amount, description: input.description })),
+    services: adminProcedure.query(() => serviceCatalog),
   }),
 });
 

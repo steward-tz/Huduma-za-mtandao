@@ -14,7 +14,16 @@ function Router() {
       <Route path={"/services"} component={Home} />
       <Route path={"/workbench"} component={Home} />
       <Route path={"/history"} component={Home} />
+      <Route path={"/tokens"} component={Home} />
       <Route path={"/account"} component={Home} />
+      <Route path={"/admin"} component={Home} />
+      <Route path={"/admin/users"} component={Home} />
+      <Route path={"/admin/tokens"} component={Home} />
+      <Route path={"/admin/services"} component={Home} />
+      <Route path={"/admin/videos"} component={Home} />
+      <Route path={"/admin/transactions"} component={Home} />
+      <Route path={"/admin/announcements"} component={Home} />
+      <Route path={"/admin/settings"} component={Home} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

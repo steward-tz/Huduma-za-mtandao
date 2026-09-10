@@ -1,226 +1,108 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
-  ArrowDownRight,
-  ArrowRight,
-  BadgeCheck,
-  BarChart3,
-  Bell,
-  Boxes,
-  Check,
-  ChevronDown,
-  CircleDashed,
-  Clock3,
-  CreditCard,
-  FileText,
-  LayoutGrid,
-  LogIn,
-  Menu,
-  MessageCircle,
-  MoreHorizontal,
-  PanelLeftClose,
-  Receipt,
-  Search,
-  Settings2,
-  ShieldCheck,
-  Sparkles,
-  Star,
-  Ticket,
-  UserRound,
-  WalletCards,
-  X,
-  Zap,
+  BadgeCheck, Baby, Bell, CarFront, ChevronRight, CircleAlert, CircleDollarSign, Contact, Copy, CreditCard, ExternalLink, FileBadge, FileWarning, HeartHandshake, History, Image, Landmark, LayoutGrid, LockKeyhole, LogIn, Menu, MessageCircle, Music2, Palette, Plane, PlayCircle, QrCode, Radio, Search, ScanFace, Settings2, ShieldCheck, Smartphone, Sparkles, Star, Store, Ticket, Trophy, Tv, UserRound, UserRoundPen, Users, Vote, WalletCards, X, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { activitySeed, formatCatalogDate, serviceCatalog, type ServiceCatalogItem } from "../../../shared/catalog";
+import { announcementText, activitySeed, serviceCatalog, specialServices, tutorials, whatsappUrl, type ServiceCatalogItem } from "../../../shared/catalog";
 
-const iconMap = {
-  receipt: Receipt,
-  "file-text": FileText,
-  sparkles: Sparkles,
-  boxes: Boxes,
-  "badge-check": BadgeCheck,
-  "chart-no-axes-combined": BarChart3,
-  "circle-dashed": CircleDashed,
-} as const;
+const icons: Record<string, React.ElementType> = { "file-badge": FileBadge, "badge-check": BadgeCheck, contact: Contact, "qr-code": QrCode, vote: Vote, store: Store, ticket: Ticket, copy: Copy, "car-front": CarFront, search: Search, landmark: Landmark, baby: Baby, plane: Plane, "heart-handshake": HeartHandshake, "file-warning": FileWarning, "music-2": Music2, "image-search": Image, smartphone: Smartphone, "scan-face": ScanFace, "user-round-pen": UserRoundPen, palette: Palette, radio: Radio, trophy: Trophy, star: Star, tv: Tv };
 
-type IconName = keyof typeof iconMap;
+function Icon({ name, size = 22 }: { name: string; size?: number }) { const Component = icons[name] ?? Sparkles; return <Component size={size} strokeWidth={1.9} />; }
 
-function ServiceIcon({ name, size = 20 }: { name: string; size?: number }) {
-  const Icon = iconMap[name as IconName] ?? CircleDashed;
-  return <Icon size={size} strokeWidth={1.8} />;
+function Notice({ children, tone = "warning" }: { children: React.ReactNode; tone?: "warning" | "success" | "info" }) { return <div className={`notice notice--${tone}`}><CircleAlert size={17} /> <span>{children}</span></div>; }
+
+function AppHeader({ onMenu, search, setSearch }: { onMenu: () => void; search: string; setSearch: (value: string) => void }) {
+  const { isAuthenticated, user } = useAuth();
+  return <>
+    <div className="announcement"><Bell size={17} /> <strong>{announcementText}</strong></div>
+    <header className="app-header">
+      <button className="mobile-menu" onClick={onMenu} aria-label="Fungua menyu"><Menu size={24} /></button>
+      <Link href="/" className="portal-brand"><span className="portal-logo"><Zap size={20} /></span><span>HUDUMA ZA <b>MTANDAONI</b></span></Link>
+      <label className="global-search"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tafuta chochote kwenye Google..." /><kbd>⌘ K</kbd></label>
+      <div className="header-actions"><button className="header-icon" onClick={() => toast("Hakuna arifa mpya kwa sasa.")} aria-label="Arifa"><Bell size={19} /><i /></button>{isAuthenticated ? <span className="header-user">{user?.name ?? "Mwanachama"}</span> : <button className="button button--green button--small" onClick={() => startLogin()}><LogIn size={15} /> Ingia / Jisajili</button>}</div>
+    </header>
+  </>;
 }
-
-function AppMark({ small = false }: { small?: boolean }) {
-  return (
-    <div className={`app-mark ${small ? "app-mark--small" : ""}`} aria-hidden="true">
-      <span />
-      <span />
-      <span />
-    </div>
-  );
-}
-
-const navItems = [
-  { href: "/", label: "Muhtasari", icon: LayoutGrid },
-  { href: "/services", label: "Huduma", icon: Zap },
-  { href: "/workbench", label: "Kituo cha kazi", icon: Ticket },
-  { href: "/history", label: "Shughuli", icon: Clock3 },
-];
 
 function Sidebar({ onClose }: { onClose?: () => void }) {
   const [location] = useLocation();
   const { user } = useAuth();
-  return (
-    <aside className="sidebar">
-      <div className="sidebar__top">
-        <Link href="/" className="brand" onClick={onClose}>
-          <AppMark />
-          <span>Kituo <b>Digitali</b></span>
-        </Link>
-        <button className="icon-button sidebar__close" onClick={onClose} aria-label="Close navigation"><PanelLeftClose size={18} /></button>
-      </div>
-      <div className="workspace-switcher">
-        <div className="workspace-avatar">KD</div>
-        <div>
-          <span className="eyebrow">Eneo la kazi</span>
-          <strong>Zana zangu</strong>
-        </div>
-        <ChevronDown size={15} className="muted-icon" />
-      </div>
-      <nav className="primary-nav" aria-label="Primary navigation">
-        <span className="eyebrow nav-label">Eneo la kazi</span>
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const active = href === "/" ? location === "/" : location.startsWith(href);
-          return <Link key={href} href={href} onClick={onClose} className={`nav-item ${active ? "is-active" : ""}`}><Icon size={17} /><span>{label}</span>{label === "Shughuli" && <span className="nav-count">3</span>}</Link>;
-        })}
-        <span className="eyebrow nav-label nav-label--spaced">Simamia</span>
-        <Link href="/account" onClick={onClose} className={`nav-item ${location.startsWith("/account") ? "is-active" : ""}`}><Settings2 size={17} /><span>Mipangilio ya akaunti</span></Link>
-        <button className="nav-item nav-item--button" onClick={() => toast.info("Kituo cha msaada kinaandaliwa kwa uzinduzi.")}><MessageCircle size={17} /><span>Kituo cha msaada</span></button>
-      </nav>
-      <div className="sidebar__bottom">
-        <div className="sidebar-tip"><div className="tip-icon"><Star size={15} fill="currentColor" /></div><div><strong>Make it yours</strong><p>Connect your own services as your toolkit grows.</p></div></div>
-        <div className="sidebar-profile">
-          <div className="profile-avatar">{user?.name?.slice(0, 2).toUpperCase() ?? "KD"}</div>
-          <div className="profile-copy"><strong>{user?.name ?? "Guest workspace"}</strong><span>{user?.email ?? "Akaunti ya majaribio"}</span></div>
-          <MoreHorizontal size={18} className="muted-icon" />
-        </div>
-      </div>
-    </aside>
-  );
+  const items = [{ href: "/", label: "Mwanzo", icon: LayoutGrid }, { href: "/services", label: "Huduma zote", icon: Zap }, { href: "/tokens", label: "Tokeni", icon: CircleDollarSign }, { href: "/history", label: "Historia", icon: History }, { href: "/account", label: "Akaunti", icon: UserRound }];
+  return <aside className="sidebar-portal"><div className="sidebar-brand"><Link href="/" onClick={onClose}>HUDUMA ZA <b>MTANDAONI</b></Link><button className="sidebar-close" onClick={onClose}><X size={20} /></button></div><div className="sidebar-user"><div className="user-avatar">{user?.name?.slice(0, 2).toUpperCase() ?? "HM"}</div><div><strong>{user?.name ?? "Mgeni"}</strong><small>{user ? "Akaunti yangu" : "Ingia kuanza"}</small></div></div><nav>{items.map(({ href, label, icon: ItemIcon }) => <Link key={href} href={href} onClick={onClose} className={`portal-nav-item ${href === "/" ? location === "/" : location.startsWith(href) ? "active" : ""}`}><ItemIcon size={19} /><span>{label}</span></Link>)}</nav>{user?.role === "admin" && <Link href="/admin" className={`portal-nav-item admin-link ${location.startsWith("/admin") ? "active" : ""}`}><Settings2 size={19} /><span>Paneli ya Admin</span></Link>}<div className="sidebar-foot"><ShieldCheck size={17} /><span>Huduma salama<br /><small>Tokeni zako zinalindwa.</small></span></div></aside>;
 }
 
-function TopBar({ onMenu }: { onMenu: () => void }) {
-  const { isAuthenticated, user } = useAuth();
-  return <header className="topbar">
-    <button className="icon-button mobile-menu" onClick={onMenu} aria-label="Open navigation"><Menu size={21} /></button>
-    <div className="breadcrumbs"><span>Eneo la kazi</span><ArrowRight size={14} /><strong>Muhtasari</strong></div>
-    <div className="topbar-actions">
-      <button className="topbar-icon" onClick={() => toast("Hakuna arifa mpya", { description: "Umeona kila kitu." })} aria-label="Arifa"><Bell size={18} /><i /></button>
-      <span className="topbar-divider" />
-      {isAuthenticated ? <div className="topbar-user"><span>{user?.name ?? "Member"}</span><div className="profile-avatar profile-avatar--small">{user?.name?.slice(0, 2).toUpperCase() ?? "KD"}</div></div> : <button className="button button--outline button--small" onClick={() => startLogin()}><LogIn size={15} /> Ingia</button>}
-    </div>
-  </header>;
+function TokenCard({ compact = false }: { compact?: boolean }) {
+  const { isAuthenticated } = useAuth();
+  const profile = trpc.portal.profile.useQuery(undefined, { enabled: isAuthenticated, retry: false });
+  const balance = profile.data?.tokenBalance ?? 0;
+  const status = profile.data?.verificationStatus ?? "pending";
+  return <section className={`token-card ${compact ? "token-card--compact" : ""}`}><div className="token-card__top"><div className="token-icon"><WalletCards size={26} /></div><div><span className="overline">Tokeni zako</span><strong>{balance}</strong><span className="token-label">tokeni</span></div></div><div className="token-card__meta"><span>Namba yako: <b>{profile.data?.phone ?? "0698232313"}</b></span><span className={`verification verification--${status}`}>{status === "approved" ? "Imeidhinishwa" : "Haijathibitishwa"}</span></div>{status !== "approved" && <div className="account-warning">Akaunti yako haijathibitishwa na admin. Tafadhali wasiliana na admin ili aidhinishe na akupe tokeni.</div>}<a className="button button--green button--wide" href={whatsappUrl} target="_blank" rel="noreferrer"><MessageCircle size={18} /> NUNUA TOKENI (WHATSAPP)</a><small className="token-note">Kila upakuaji hukata tokeni 2.</small></section>;
 }
 
-function SectionHeading({ eyebrow, title, action }: { eyebrow?: string; title: string; action?: React.ReactNode }) {
-  return <div className="section-heading"><div>{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h2>{title}</h2></div>{action}</div>;
+function ServiceCard({ service, onUse }: { service: ServiceCatalogItem; onUse: (service: ServiceCatalogItem) => void }) {
+  const locked = service.kind === "locked";
+  return <button className={`portal-service-card service-${service.kind}`} onClick={() => onUse(service)}><div className="service-card-icon"><Icon name={service.icon} /></div><div className="service-card-copy"><strong>{service.name}</strong><span>{service.description}</span></div><div className="service-card-foot">{locked ? <span className="locked-label"><LockKeyhole size={14} /> IMEFUNGWA</span> : service.kind === "free" ? <span className="free-label">Bure</span> : <span className="paid-label"><CreditCard size={14} /> Tokeni {service.tokenCost}</span>}<ChevronRight size={17} /></div></button>;
 }
 
-function ServiceCard({ service, onOpen }: { service: ServiceCatalogItem; onOpen: (service: ServiceCatalogItem) => void }) {
-  return <button className={`service-card accent-${service.accent}`} onClick={() => onOpen(service)} disabled={service.status === "soon"}>
-    <div className="service-card__top"><span className="service-icon"><ServiceIcon name={service.icon} size={19} /></span>{service.tag && <span className={`card-tag ${service.status === "soon" ? "card-tag--muted" : ""}`}>{service.tag}</span>}<span className="service-card__arrow"><ArrowUpRight /></span></div>
-    <div className="service-card__body"><span className="card-category">{service.category}</span><h3>{service.name}</h3><p>{service.description}</p></div>
-    <div className="service-card__footer"><span><CreditCard size={14} /> {service.credits} vizio</span><span>{service.status === "soon" ? "Inakuja hivi karibuni" : "Fungua zana"}</span></div>
-  </button>;
+function ServiceGrid({ title, services, onUse }: { title: string; services: ServiceCatalogItem[]; onUse: (service: ServiceCatalogItem) => void }) { return <section className="portal-section"><div className="section-title"><div><span className="overline">Mkusanyiko wa huduma</span><h2>{title}</h2></div><span className="section-count">{services.length}</span></div><div className="portal-service-grid">{services.map((service) => <ServiceCard key={service.slug} service={service} onUse={onUse} />)}</div></section>; }
+
+function SpecialSection() {
+  const open = (item: typeof specialServices[number]) => { if (item.action === "whatsapp") window.open(whatsappUrl, "_blank", "noopener,noreferrer"); else toast("Tuma ujumbe WhatsApp kupata maelezo ya malipo.", { action: { label: "WhatsApp", onClick: () => window.open(whatsappUrl, "_blank") } }); };
+  return <section className="portal-section"><div className="section-title"><div><span className="overline">Ofa na jumuiya</span><h2>HUDUMA MAALUM</h2></div></div><div className="special-grid">{specialServices.map((item) => <button key={item.slug} className={`special-card special-card--${item.tone}`} onClick={() => open(item)}><div><strong>{item.name}</strong><small>{item.action === "whatsapp" ? "Fungua WhatsApp" : "Wasiliana nasi kwa malipo"}</small></div><ExternalLink size={18} /></button>)}</div></section>;
 }
 
-function ServiceModal({ service, onClose }: { service: ServiceCatalogItem; onClose: () => void }) {
-  const [, navigate] = useLocation();
-  return <div className="modal-backdrop" role="presentation" onClick={onClose}><div className="modal" role="dialog" aria-modal="true" aria-labelledby="service-modal-title" onClick={(event) => event.stopPropagation()}>
-    <button className="icon-button modal__close" onClick={onClose} aria-label="Close"><X size={18} /></button>
-    <div className={`service-icon service-icon--large accent-${service.accent}`}><ServiceIcon name={service.icon} size={24} /></div>
-    <span className="eyebrow">{service.category}</span><h2 id="service-modal-title">{service.name}</h2><p className="modal__description">{service.detail}</p>
-    <div className="modal__meta"><span><CreditCard size={15} /> Uses {service.credits} vizio</span><span><ShieldCheck size={15} /> Faragha kwa chaguo-msingi</span></div>
-    {service.status === "available" ? <button className="button button--primary button--full" onClick={() => { onClose(); navigate(`/workbench?service=${service.slug}`); }}>Fungua kwenye kituo cha kazi <ArrowRight size={16} /></button> : <button className="button button--muted button--full" onClick={onClose}>Nijulishe ikiwa tayari</button>}
-  </div></div>;
-}
-
-function BalanceCard() {
-  const { user } = useAuth();
-  return <div className="balance-card">
-    <div className="balance-card__main"><div className="balance-icon"><WalletCards size={21} /></div><div><span className="eyebrow">Salio lililopo</span><div className="balance-number">128 <small>vizio</small></div><p><span className="status-dot" /> Tayari kutumia kwenye zana zako</p></div></div>
-    <div className="balance-card__side"><span className="eyebrow">{user ? "Umeingia kama" : "Hali ya majaribio"}</span><strong>{user?.name ?? "Eneo lako la kazi"}</strong><span className="muted-copy">Vizio huongezeka unapoongeza kifurushi.</span><button className="button button--dark" onClick={() => toast.success("Vifurushi vya vizio vitapatikana hivi karibuni.", { description: "Kwa sasa, chunguza zana zilizopo." })}>Ongeza vizio <ArrowDownRight size={16} /></button></div>
-  </div>;
-}
-
-function Overview({ onOpen }: { onOpen: (service: ServiceCatalogItem) => void }) {
-  const [search, setSearch] = useState("");
-  const servicesQuery = trpc.services.list.useQuery();
-  const services = servicesQuery.data?.length ? servicesQuery.data : serviceCatalog;
-  const filtered = useMemo(() => services.filter((service) => `${service.name} ${service.category} ${service.description}`.toLowerCase().includes(search.toLowerCase())), [services, search]);
-  return <>
-    <section className="hero-panel"><div className="hero-panel__copy"><div className="eyebrow eyebrow--bright"><span className="eyebrow-pulse" /> Kituo chako cha kazi za kidigitali</div><h1>Tengeneza nafasi kwa<br /><em>jambo linalofuata.</em></h1><p>Mkusanyiko wa zana rahisi kwa kazi ndogo zinazoendeleza kazi yako. Chagua huduma, anza, na hifadhi muhimu.</p><div className="hero-meta"><span><Zap size={14} /> Imeundwa kwa kasi</span><span><ShieldCheck size={14} /> Imeundwa kwa eneo lako la kazi</span></div></div><div className="hero-panel__signal"><div className="signal-ring"><div className="signal-core"><Sparkles size={25} /></div></div><span className="signal-label">Eneo moja la kazi<br /><b>mianzo mingi</b></span><div className="signal-lines"><i /><i /><i /></div></div></section>
-    <BalanceCard />
-    <section className="section-block" id="services"><SectionHeading eyebrow="Anza hapa" title="Huduma zako" action={<Link href="/services" className="text-link">Tazama zote <ArrowRight size={15} /></Link>} /><div className="service-grid">{filtered.slice(0, 4).map((service) => <ServiceCard key={service.slug} service={service} onOpen={onOpen} />)}</div>{filtered.length === 0 && <div className="empty-state"><Search size={20} /><p>No tools match “{search}”. Try another phrase.</p></div>}<div className="inline-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tafuta huduma zako..." aria-label="Tafuta huduma zako" />{search && <button onClick={() => setSearch("")}><X size={15} /></button>}<kbd>⌘ K</kbd></div></section>
-    <section className="split-section"><div><SectionHeading eyebrow="Endelea kusonga" title="Fanya hatua yako inayofuata iwe rahisi." /><p className="section-description">Hifadhi kazi za mara moja, violezo na majaribio madogo sehemu moja. Anza na huduma hapa chini au tengeneza mtiririko mpya kwenye kituo cha kazi.</p><Link href="/workbench" className="button button--dark">Fungua kituo cha kazi <ArrowRight size={16} /></Link></div><div className="mini-stat-card"><div className="mini-stat-card__top"><span className="stat-icon"><BarChart3 size={17} /></span><span className="eyebrow">Mwezi huu</span></div><strong>07</strong><p>kazi zimegeuka kuwa hatua inayofuata</p><div className="stat-bars"><i /><i /><i /><i /><i /><i /><i /></div></div></section>
-  </>;
-}
-
-function ServicesPage({ onOpen }: { onOpen: (service: ServiceCatalogItem) => void }) {
-  const [filter, setFilter] = useState("Huduma zote");
-  const [query, setQuery] = useState("");
-  const categories = ["Huduma zote", ...Array.from(new Set(serviceCatalog.map((service) => service.category)))];
-  const filtered = serviceCatalog.filter((service) => (filter === "Huduma zote" || service.category === filter) && `${service.name} ${service.description}`.toLowerCase().includes(query.toLowerCase()));
-  return <section className="page-shell"><div className="page-intro"><div><span className="eyebrow">Maktaba</span><h1>Huduma kwa kazi zilizo katikati.</h1><p>Zana rahisi za kubadilisha kazi iliyo wazi kuwa hatua unayoweza kuendelea nayo.</p></div><div className="page-intro__mark"><Zap size={25} /><span>06<br /><small>zana</small></span></div></div><div className="toolbar"><div className="filter-pills">{categories.map((category) => <button className={filter === category ? "is-selected" : ""} onClick={() => setFilter(category)} key={category}>{category}</button>)}</div><label className="search-field"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tafuta huduma" /></label></div><div className="service-grid service-grid--all">{filtered.map((service) => <ServiceCard key={service.slug} service={service} onOpen={onOpen} />)}</div></section>;
-}
-
-function WorkbenchPage() {
-  const [location, navigate] = useLocation();
-  const serviceSlug = new URLSearchParams(location.split("?")[1] ?? "").get("service") ?? "invoice-studio";
-  const selected = serviceCatalog.find((service) => service.slug === serviceSlug) ?? serviceCatalog[0];
-  const [brief, setBrief] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [runReference, setRunReference] = useState<string | null>(null);
-  const [service, setService] = useState(selected.slug);
-  const selectedService = serviceCatalog.find((item) => item.slug === service) ?? selected;
-  const createRun = trpc.workItems.create.useMutation({
-    onSuccess: (result) => {
-      setRunReference(result.reference);
-      setSubmitted(true);
-      toast.success("Kazi yako imewekwa kwenye foleni.", { description: `Reference ${result.reference} is now in Activity.` });
-    },
-    onError: (error) => toast.error("Hatukuweza kuhifadhi kazi hiyo.", { description: error.message }),
-  });
-  function submit(event: React.FormEvent) {
-    event.preventDefault();
-    createRun.mutate({ serviceSlug: selectedService.slug, brief });
-  }
-  return <section className="page-shell"><div className="page-intro page-intro--compact"><div><span className="eyebrow">Kituo cha kazi</span><h1>Anza na maelezo yaliyo wazi.</h1><p>Ipe zana maelezo ya kutosha. Unaweza kurudi na kuyaboresha wakati wowote.</p></div><div className="workbench-status"><span className="status-dot" /> Uhifadhi wa moja kwa moja</div></div><div className="workbench-layout"><form className="workbench-form" onSubmit={submit}><div className="form-step"><span className="step-number">01</span><div className="form-step__content"><label htmlFor="service">Chagua huduma</label><p>Chagua mwanzo bora wa kazi hii.</p><select id="service" value={service} onChange={(event) => { setService(event.target.value); navigate(`/workbench?service=${event.target.value}`); }}>{serviceCatalog.filter((item) => item.status === "available").map((item) => <option key={item.slug} value={item.slug}>{item.name} · {item.credits} vizio</option>)}</select></div></div><div className="form-step"><span className="step-number">02</span><div className="form-step__content"><label htmlFor="brief">Unajaribu kuendeleza jambo gani?</label><p>Sentensi chache zinatosha. Epuka taarifa nyeti.</p><textarea id="brief" rows={7} value={brief} onChange={(event) => setBrief(event.target.value)} placeholder="Mfano: Nahitaji ankara rahisi kwa mradi wa mteja wa mara kwa mara..." required /></div></div><div className="form-footer"><span><ShieldCheck size={15} /> Rasimu yako inabaki kwenye eneo hili la kazi.</span><button className="button button--primary" type="submit" disabled={createRun.isPending}> {createRun.isPending ? "Inahifadhi..." : <>Endesha {selectedService.name} <ArrowRight size={16} /></>}</button></div></form><aside className="workbench-aside"><div className={`preview-tool-card accent-${selectedService.accent}`}><div className="service-icon"><ServiceIcon name={selectedService.icon} /></div><span className="eyebrow">Zana iliyochaguliwa</span><h2>{selectedService.name}</h2><p>{selectedService.detail}</p><div className="preview-tool-card__bottom"><span><CreditCard size={14} /> {selectedService.credits} vizio</span><span className="status-badge"><span className="status-dot" /> Tayari</span></div></div><div className="tip-card"><Sparkles size={17} /><div><strong>Maelezo mazuri huwa mahususi.</strong><p>Taja walengwa, matokeo na masharti muhimu.</p></div></div></aside></div>{submitted && <div className="success-banner"><div className="success-icon"><Check size={17} /></div><div><strong>Kazi ya majaribio imeundwa</strong><p>{runReference ? `Kumbukumbu ${runReference} imehifadhiwa kwenye Shughuli.` : "Your work item is ready in Shughuli."} Huu ni mtiririko salama wa majaribio hadi uunganishe huduma ya uzalishaji.</p></div><Link href="/history" className="text-link">Tazama shughuli <ArrowRight size={15} /></Link></div>}</section>;
+function TutorialsSection() {
+  const [selected, setSelected] = useState<typeof tutorials[number] | null>(null);
+  return <section className="portal-section"><div className="section-title"><div><span className="overline">Jifunze kwa hatua</span><h2>VIDEO ZA MAFUNZO</h2></div></div><div className="tutorial-grid">{tutorials.map((item) => <button className="tutorial-card" key={item.slug} onClick={() => setSelected(item)}><span className="play-circle"><PlayCircle size={25} /></span><strong>{item.title}</strong><small>{item.description}</small><span className="paid-label"><CreditCard size={13} /> Tokeni {item.tokenCost}</span></button>)}</div>{selected && <div className="portal-modal-backdrop" onClick={() => setSelected(null)}><div className="portal-modal" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setSelected(null)}><X size={19} /></button><PlayCircle size={42} className="modal-symbol" /><h3>{selected.title}</h3>{selected.videoUrl ? <video src={selected.videoUrl} controls /> : <Notice tone="info">Video itaongezwa na admin hivi karibuni. Hakuna kiungo bandia kilichowekwa.</Notice>}<button className="button button--green button--wide" onClick={() => setSelected(null)}>Funga</button></div></div>}</section>;
 }
 
 function HistoryPage() {
-  const recentQuery = trpc.activity.recent.useQuery();
-  const rows = recentQuery.data?.length ? recentQuery.data : activitySeed;
-  return <section className="page-shell"><div className="page-intro page-intro--compact"><div><span className="eyebrow">Shughuli</span><h1>Rekodi tulivu ya maendeleo.</h1><p>Kila kazi, namba ya kumbukumbu na matumizi ya vizio sehemu moja.</p></div><button className="button button--outline" onClick={() => toast("Uhamishaji unakuja hivi karibuni.")}><ArrowDownRight size={16} /> Hamisha</button></div><div className="activity-card"><div className="activity-card__header"><div><span className="eyebrow">Kazi za hivi karibuni</span><h2>Shughuli za mwisho</h2></div><span className="activity-count">{rows.length} rekodi</span></div><div className="activity-table"><div className="activity-row activity-row--head"><span>Huduma</span><span>Kumbukumbu</span><span>Vizio</span><span>Hali</span><span>Tarehe</span></div>{rows.map((row) => <div className="activity-row" key={row.reference}><div className="activity-service"><span className="table-icon"><Check size={14} /></span><span><strong>{row.service}</strong><small>{row.type}</small></span></div><span className="mono">{row.reference}</span><span className="credit-use"><CreditCard size={14} /> {row.credits}</span><span><span className="table-status"><i />{row.status}</span></span><span className="date-copy">{formatCatalogDate(row.createdAt)}</span></div>)}</div></div></section>;
+  const { isAuthenticated } = useAuth();
+  const query = trpc.portal.tokenHistory.useQuery(undefined, { enabled: isAuthenticated });
+  const activityQuery = trpc.portal.activity.useQuery(undefined, { enabled: isAuthenticated });
+  const rows = activityQuery.data?.length ? activityQuery.data : activitySeed;
+  return <main className="portal-main"><div className="page-heading"><div><span className="overline">Rekodi zako</span><h1>HISTORIA YA TOKENI</h1><p>Angalia tokeni zilizotumika, zilizoongezwa na salio lako.</p></div></div><div className="history-table"><div className="history-head"><span>Tarehe</span><span>Huduma</span><span>Tokeni</span><span>Salio</span><span>Rejea</span></div>{query.data?.length ? query.data.map((row) => <div className="history-row" key={row.reference}><span>{new Date(row.createdAt).toLocaleString("sw-TZ")}</span><strong>{row.description}</strong><span className={row.amount < 0 ? "amount-negative" : "amount-positive"}>{row.amount > 0 ? "+" : ""}{row.amount}</span><span>{row.balanceAfter}</span><code>{row.reference}</code></div>) : rows.map((row) => <div className="history-row" key={row.reference}><span>{new Date(row.createdAt).toLocaleDateString("sw-TZ")}</span><strong>{row.service}</strong><span className="amount-negative">-{row.credits}</span><span>0</span><code>{row.reference}</code></div>)}</div><Notice tone="info">Historia halisi ya tokeni itaonekana baada ya kuingia na kutumia huduma.</Notice></main>;
 }
 
-function AccountPage() {
+function AdminPage() {
+  const [location] = useLocation();
   const { user, isAuthenticated } = useAuth();
-  return <section className="page-shell"><div className="page-intro page-intro--compact"><div><span className="eyebrow">Akaunti</span><h1>Fanya eneo hili liwe lako.</h1><p>Panga utambulisho, mapendeleo na taarifa zako za ufikiaji.</p></div></div><div className="account-grid"><div className="account-card account-card--profile"><div className="profile-avatar profile-avatar--large">{user?.name?.slice(0, 2).toUpperCase() ?? "KD"}</div><span className="eyebrow">{isAuthenticated ? "Mwanachama wa eneo la kazi" : "Akaunti ya majaribio"}</span><h2>{user?.name ?? "Your name here"}</h2><p>{user?.email ?? "Ingia kuunganisha your account details."}</p><button className="button button--outline" onClick={() => isAuthenticated ? toast("Uhariri wa wasifu unakuja hivi karibuni.") : startLogin()}>{isAuthenticated ? "Hariri wasifu" : "Ingia kuunganisha"}</button></div><div className="account-card"><div className="account-card__header"><span className="service-icon service-icon--soft"><ShieldCheck size={18} /></span><div><span className="eyebrow">Faragha</span><h3>Imeundwa kwa eneo lako la kazi</h3></div></div><p>Maelezo ya huduma na shughuli hubaki kwenye akaunti yako. Ukiwa tayari, unaweza kuongeza miunganisho yako bila kubadilisha urambazaji mkuu.</p><div className="setting-line"><span>Usalama wa kipindi</span><span className="setting-value"><span className="status-dot" /> Imelindwa</span></div><div className="setting-line"><span>Arifa</span><button className="text-link" onClick={() => toast("Mapendeleo ya arifa yanakuja hivi karibuni.")}>Simamia <ArrowRight size={14} /></button></div></div><div className="account-card account-card--wide"><div className="account-card__header"><span className="service-icon service-icon--soft"><CreditCard size={18} /></span><div><span className="eyebrow">Vizio</span><h3>Matumizi na salio</h3></div></div><div className="usage-layout"><div><strong>128</strong><span>vizio vilivyopo</span></div><div className="usage-bar"><span style={{ width: "36%" }} /></div><p>36% ya mgao wako wa kila mwezi wa kuanzia imetumika.</p></div></div></div></section>;
+  const stats = trpc.admin.stats.useQuery(undefined, { enabled: isAuthenticated && user?.role === "admin" });
+  const users = trpc.admin.users.useQuery(undefined, { enabled: isAuthenticated && user?.role === "admin" });
+  const services = trpc.admin.services.useQuery(undefined, { enabled: isAuthenticated && user?.role === "admin" });
+  const verify = trpc.admin.verifyUser.useMutation({ onSuccess: () => { users.refetch(); toast.success("Hali ya mtumiaji imesasishwa."); } });
+  const adjust = trpc.admin.adjustTokens.useMutation({ onSuccess: () => { users.refetch(); toast.success("Tokeni zimesasishwa."); } });
+  if (!isAuthenticated || user?.role !== "admin") return <main className="portal-main"><Notice>Ukurasa huu ni wa admin pekee. Ingia kwa akaunti yenye ruhusa ya admin.</Notice><button className="button button--green" onClick={() => startLogin()}>Ingia</button></main>;
+  const data = stats.data ?? { totalUsers: 0, pendingUsers: 0, approvedUsers: 0, totalTokensIssued: 0, totalTokensUsed: 0, totalServiceUsage: 0 };
+  const section = location.split("/")[2] ?? "overview";
+  const tabs = [["/admin", "Muhtasari"], ["/admin/users", "Watumiaji"], ["/admin/tokens", "Tokeni"], ["/admin/services", "Huduma"], ["/admin/videos", "Video"], ["/admin/transactions", "Miamala"], ["/admin/announcements", "Matangazo"], ["/admin/settings", "Mipangilio"]] as const;
+  return <main className="portal-main"><div className="page-heading"><div><span className="overline">Udhibiti wa mfumo</span><h1>PANELI YA ADMIN</h1><p>Simamia watumiaji, tokeni, huduma na matumizi.</p></div></div><div className="admin-tabs">{tabs.map(([href, label]) => <Link key={href} href={href} className={location === href ? "active" : ""}>{label}</Link>)}</div>{section === "overview" && <div className="admin-stats">{[["Watumiaji wote", data.totalUsers], ["Wanasubiri", data.pendingUsers], ["Wameidhinishwa", data.approvedUsers], ["Tokeni zilizotolewa", data.totalTokensIssued], ["Tokeni zilizotumika", data.totalTokensUsed], ["Matumizi ya huduma", data.totalServiceUsage]].map(([label, value]) => <div className="admin-stat" key={label as string}><span>{label}</span><strong>{value}</strong></div>)}</div>}{(section === "overview" || section === "users" || section === "tokens") && <section className="admin-panel"><div className="section-title"><h2>{section === "tokens" ? "Usimamizi wa tokeni" : "Watumiaji"}</h2><span className="section-count">{users.data?.length ?? 0}</span></div><div className="admin-users">{users.data?.map((person) => <div className="admin-user-row" key={person.id}><div className="user-avatar">{person.name?.slice(0, 2).toUpperCase() ?? "HM"}</div><div className="admin-user-copy"><strong>{person.name ?? "Bila jina"}</strong><span>{person.email ?? "Hakuna barua pepe"} · {person.tokenBalance} tokeni</span></div><span className={`verification verification--${person.verificationStatus}`}>{person.verificationStatus}</span><div className="admin-user-actions">{person.verificationStatus !== "approved" && <button onClick={() => verify.mutate({ userId: person.id, status: "approved" })}>Idhinisha</button>}<button onClick={() => adjust.mutate({ userId: person.id, amount: 20, description: "Tokeni zilizoongezwa na admin" })}>+20 tokeni</button></div></div>)}</div></section>}{section === "services" && <section className="admin-panel"><div className="section-title"><h2>Huduma zote</h2><span className="section-count">{services.data?.length ?? 0}</span></div><div className="admin-users">{services.data?.map((service) => <div className="admin-user-row" key={service.slug}><div className="service-card-icon"><Icon name={service.icon} size={18} /></div><div className="admin-user-copy"><strong>{service.name}</strong><span>{service.category} · {service.kind === "free" ? "Bure" : service.kind === "locked" ? "Imefungwa" : `Tokeni ${service.tokenCost}`}</span></div></div>)}</div></section>}{section === "videos" && <section className="admin-panel"><div className="section-title"><h2>Video za mafunzo</h2></div><Notice tone="info">Ongeza video halisi kupitia mfumo wa admin utakapoingiza URL ya video. Mfumo hauhifadhi URL bandia.</Notice></section>}{section === "transactions" && <section className="admin-panel"><div className="section-title"><h2>Miamala ya tokeni</h2></div><Notice tone="info">Miamala yote ya tokeni huhifadhiwa na audit reference kwenye database.</Notice></section>}{section === "announcements" && <section className="admin-panel"><div className="section-title"><h2>Matangazo</h2></div><div className="notice notice--warning">Wasiliana na 0698232313 kwa huduma za tokeni n.k</div></section>}{section === "settings" && <section className="admin-panel"><div className="section-title"><h2>Mipangilio ya mfumo</h2></div><Notice tone="success">Tokeni za huduma zinazolipiwa: 2. Huduma za bure hazikati tokeni.</Notice></section>}</main>;
 }
+
+function AccountPage() { const { isAuthenticated, user, logout } = useAuth(); return <main className="portal-main"><div className="page-heading"><div><span className="overline">Wasifu na usalama</span><h1>AKAUNTI</h1><p>Simamia taarifa za akaunti yako.</p></div></div><section className="account-panel"><div className="large-avatar">{user?.name?.slice(0, 2).toUpperCase() ?? "HM"}</div><h2>{user?.name ?? "Mgeni"}</h2><p>{user?.email ?? "Hujaingia kwenye akaunti."}</p>{isAuthenticated ? <><Notice tone="success">Umeingia kwa usalama kupitia mfumo wa uthibitishaji.</Notice><button className="button button--dark" onClick={() => logout()}>Toka kwenye akaunti</button></> : <button className="button button--green" onClick={() => startLogin()}>Ingia / Jisajili</button>}</section></main>; }
+
+function PortalHome({ search, onUse }: { search: string; onUse: (service: ServiceCatalogItem) => void }) {
+  const lower = search.toLowerCase();
+  const matches = serviceCatalog.filter((service) => `${service.name} ${service.description} ${service.category}`.toLowerCase().includes(lower));
+  const main = matches.filter((service) => service.category === "Huduma kuu" || service.category === "Huduma za bure");
+  const locked = matches.filter((service) => service.kind === "locked");
+  const tools = matches.filter((service) => service.category === "Zana za ziada");
+  return <main className="portal-main"><div className="welcome-strip"><div><span className="overline">Karibu HUDUMA ZA MTANDAONI</span><h1>Huduma zako, sehemu moja.</h1><p>Chagua huduma unayotaka. Tokeni hukatwa kwa usalama kwenye mfumo.</p></div><Sparkles size={44} /></div><TokenCard /><ServiceGrid title="HUDUMA ZOTE" services={main} onUse={onUse} /><ServiceGrid title="HUDUMA ZILIZOFUNGWA" services={locked} onUse={onUse} /><SpecialSection /><ServiceGrid title="ZANA ZA ZIADA" services={tools} onUse={onUse} /><TutorialsSection /></main>;
+}
+
+function BottomNav() { return <nav className="bottom-nav">{[{ href: "/", label: "Mwanzo", icon: LayoutGrid }, { href: "/services", label: "Huduma", icon: Zap }, { href: "/tokens", label: "Tokeni", icon: CircleDollarSign }, { href: "/history", label: "Historia", icon: History }, { href: "/account", label: "Akaunti", icon: UserRound }].map(({ href, label, icon: ItemIcon }) => <Link href={href} key={href}><ItemIcon size={19} /><span>{label}</span></Link>)}</nav>; }
 
 export default function Home() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState<ServiceCatalogItem | null>(null);
-  const page = location.split("?")[0];
-  return <div className="app-frame"><div className={`mobile-overlay ${menuOpen ? "is-visible" : ""}`} onClick={() => setMenuOpen(false)} /><div className={`sidebar-drawer ${menuOpen ? "is-open" : ""}`}><Sidebar onClose={() => setMenuOpen(false)} /></div><div className="desktop-sidebar"><Sidebar /></div><main className="main-content"><TopBar onMenu={() => setMenuOpen(true)} /><div className="content-wrap">{page === "/services" ? <ServicesPage onOpen={setSelectedService} /> : page === "/workbench" ? <WorkbenchPage /> : page === "/history" ? <HistoryPage /> : page === "/account" ? <AccountPage /> : <Overview onOpen={setSelectedService} />}</div><footer className="site-footer"><span><AppMark small /> Kituo Digitali</span><span>Wazo la zana huru · Tayari kupanuliwa</span></footer></main>{selectedService && <ServiceModal service={selectedService} onClose={() => setSelectedService(null)} />}</div>;
-}
-
-function ArrowUpRight() {
-  return <ArrowRight size={16} className="arrow-up-right" />;
+  const [search, setSearch] = useState("");
+  const { isAuthenticated } = useAuth();
+  const useService = trpc.portal.useService.useMutation({ onSuccess: (result) => toast.success(`${result.service} imefunguliwa.`, { description: `Rejea: ${result.reference}` }), onError: (error) => toast.error(error.message) });
+  const handleUse = (service: ServiceCatalogItem) => { if (service.kind === "locked") { toast.error("Huduma hii imefungwa kwa sasa."); return; } if (!isAuthenticated) { toast("Ingia kwanza ili kutumia huduma."); startLogin(); return; } useService.mutate({ serviceSlug: service.slug, brief: "Matumizi kupitia portal ya HUDUMA ZA MTANDAONI" }); };
+  const page = location.startsWith("/admin") ? <AdminPage /> : location === "/history" ? <HistoryPage /> : location === "/account" ? <AccountPage /> : location === "/tokens" ? <main className="portal-main"><TokenCard /><Notice tone="info">Nunua tokeni kupitia WhatsApp ili admin aweze kukuwekea tokeni kwenye akaunti yako.</Notice></main> : <PortalHome search={search} onUse={handleUse} />;
+  return <div className="portal-shell"><div className={`portal-overlay ${menuOpen ? "show" : ""}`} onClick={() => setMenuOpen(false)} /><div className={`portal-sidebar-wrap ${menuOpen ? "open" : ""}`}><Sidebar onClose={() => setMenuOpen(false)} /></div><div className="portal-content"><AppHeader onMenu={() => setMenuOpen(true)} search={search} setSearch={setSearch} />{page}<footer className="portal-footer">Programu hii ilitengenezwa na Bw. Zoom Cotex Limited <span>© Haki zote zimehifadhiwa 2026</span></footer></div><BottomNav /></div>;
 }

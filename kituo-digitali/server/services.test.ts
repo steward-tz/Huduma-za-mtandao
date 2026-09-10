@@ -10,23 +10,20 @@ function createPublicContext(): TrpcContext {
   };
 }
 
-describe("services router", () => {
-  it("returns the original service catalog", async () => {
+describe("HUDUMA ZA MTANDAONI portal", () => {
+  it("returns the full Kiswahili service catalog", async () => {
     const caller = appRouter.createCaller(createPublicContext());
-    const services = await caller.services.list();
-
-    expect(services.length).toBeGreaterThanOrEqual(4);
-    expect(services.some((service) => service.slug === "invoice-studio")).toBe(true);
-    expect(services.every((service) => service.name && service.description)).toBe(true);
+    const services = await caller.portal.services();
+    expect(services.length).toBeGreaterThanOrEqual(20);
+    expect(services.find((service) => service.slug === "utafutaji-nida")?.kind).toBe("free");
+    expect(services.find((service) => service.slug === "cheti-tin")?.tokenCost).toBe(2);
   });
 
-  it("looks up a service by slug and safely misses unknown slugs", async () => {
+  it("returns announcement text and tutorials without fake video URLs", async () => {
     const caller = appRouter.createCaller(createPublicContext());
-
-    await expect(caller.services.getBySlug({ slug: "brand-spark" })).resolves.toMatchObject({
-      name: "Cheche ya Chapa",
-      credits: 4,
-    });
-    await expect(caller.services.getBySlug({ slug: "not-a-real-tool" })).resolves.toBeNull();
+    expect(await caller.portal.announcement()).toContain("0698232313");
+    const tutorials = await caller.portal.tutorials();
+    expect(tutorials).toHaveLength(3);
+    expect(tutorials.every((tutorial) => !tutorial.videoUrl)).toBe(true);
   });
 });

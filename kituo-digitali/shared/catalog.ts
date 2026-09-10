@@ -1,16 +1,14 @@
-export type ServiceStatus = "available" | "soon";
+export type ServiceKind = "paid" | "free" | "locked";
 
 export type ServiceCatalogItem = {
   slug: string;
   name: string;
-  category: string;
   description: string;
-  detail: string;
   icon: string;
-  accent: string;
-  credits: number;
-  status: ServiceStatus;
-  tag?: string;
+  tokenCost: number;
+  kind: ServiceKind;
+  category: string;
+  actionUrl?: string;
 };
 
 export type ActivityItem = {
@@ -19,95 +17,79 @@ export type ActivityItem = {
   credits: number;
   status: string;
   reference: string;
-  createdAt: string;
+  createdAt: string | Date;
 };
 
+export type TutorialItem = {
+  slug: string;
+  title: string;
+  description: string;
+  tokenCost: number;
+  videoUrl?: string;
+};
+
+export const announcementText = "Wasiliana na 0698232313 kwa huduma za tokeni n.k";
+export const whatsappNumber = "255698232313";
+export const whatsappMessage = "Habari $teward Tz, nataka kununua tokeni. Namba yangu ni 0723232323.";
+export const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+
+const paid = (slug: string, name: string, description: string, icon: string, category: string): ServiceCatalogItem => ({ slug, name, description, icon, category, tokenCost: 2, kind: "paid" });
+const free = (slug: string, name: string, description: string, icon: string, category: string): ServiceCatalogItem => ({ slug, name, description, icon, category, tokenCost: 0, kind: "free" });
+const locked = (slug: string, name: string, description: string, icon: string, category: string): ServiceCatalogItem => ({ slug, name, description, icon, category, tokenCost: 0, kind: "locked" });
+
 export const serviceCatalog: ServiceCatalogItem[] = [
-  {
-    slug: "invoice-studio",
-    name: "Studio ya Ankara",
-    category: "Zana za biashara",
-    description: "Tengeneza ankara nadhifu na vikumbusho vya malipo kwa dakika chache.",
-    detail: "Tengeneza ankara inayotumika tena, ihamishe na hifadhi kila toleo karibu.",
-    icon: "receipt",
-    accent: "aqua",
-    credits: 2,
-    status: "available",
-    tag: "Maarufu",
-  },
-  {
-    slug: "document-desk",
-    name: "Dawati la Nyaraka",
-    category: "Nyaraka",
-    description: "Badilisha noti mbichi kuwa nyaraka zilizo wazi na tayari kushirikiwa.",
-    detail: "Anza na maelezo, chagua muundo na pata rasimu safi ya waraka.",
-    icon: "file-text",
-    accent: "violet",
-    credits: 3,
-    status: "available",
-    tag: "Mpya",
-  },
-  {
-    slug: "brand-spark",
-    name: "Cheche ya Chapa",
-    category: "Ubunifu",
-    description: "Tengeneza mwelekeo mfupi wa kampeni yako inayofuata.",
-    detail: "Fafanua mwelekeo wa kuona kwa jina, ujumbe, walengwa na orodha ya uzinduzi.",
-    icon: "sparkles",
-    accent: "amber",
-    credits: 4,
-    status: "available",
-  },
-  {
-    slug: "stock-check",
-    name: "Ukaguzi wa Stoo",
-    category: "Uendeshaji",
-    description: "Kagua muhtasari wa stoo na ona kinachohitaji uangalizi.",
-    detail: "Bandika orodha yako ya sasa ya stoo kupata mwonekano wa kujaza tena.",
-    icon: "boxes",
-    accent: "mint",
-    credits: 2,
-    status: "available",
-  },
-  {
-    slug: "profile-kit",
-    name: "Kifurushi cha Wasifu",
-    category: "Ukuaji",
-    description: "Tengeneza wasifu wa kitaalamu kwa tovuti na mitandao ya kijamii.",
-    detail: "Badilisha uzoefu wako kuwa maandishi mafupi ya wasifu na mfumo wa wasifu.",
-    icon: "badge-check",
-    accent: "coral",
-    credits: 3,
-    status: "soon",
-    tag: "Karibuni",
-  },
-  {
-    slug: "market-pulse",
-    name: "Mapigo ya Soko",
-    category: "Maarifa",
-    description: "Muhtasari mwepesi wa kulinganisha fursa yako inayofuata.",
-    detail: "Kusanya ishara, linganisha chaguo na hifadhi hatua inayofuata.",
-    icon: "chart-no-axes-combined",
-    accent: "blue",
-    credits: 5,
-    status: "soon",
-  },
+  paid("cheti-tin", "CHETI CHA TIN", "Pata cheti cha TIN kwa hatua rahisi.", "file-badge", "Huduma kuu"),
+  paid("thibitisha-tin", "THIBITISHA TIN", "Thibitisha taarifa za TIN yako.", "badge-check", "Huduma kuu"),
+  paid("nakala-nida", "NAKALA LAINI YA NIDA", "Omba nakala laini ya kitambulisho cha NIDA.", "contact", "Huduma kuu"),
+  paid("stika-lipa", "STIKA ZA LIPA", "Pata stika za LIPA kwa matumizi yako.", "qr-code", "Huduma kuu"),
+  paid("mpiga-kura", "MPIGA KURA", "Huduma na taarifa za mpiga kura.", "vote", "Huduma kuu"),
+  paid("leseni-biashara", "LESENI YA BIASHARA", "Anza mchakato wa leseni ya biashara.", "store", "Huduma kuu"),
+  paid("stika-mawakala", "STIKA ZA MAWAKALA", "Pata stika za mawakala.", "ticket", "Huduma kuu"),
+  paid("nakala-nida-2", "NAKALA LAINI YA NIDA 2", "Nakala nyingine ya taarifa za NIDA.", "copy", "Huduma kuu"),
+  paid("leseni-udereva", "LESENI YA UDEREVA", "Msaada wa huduma za leseni ya udereva.", "car-front", "Huduma kuu"),
+  free("utafutaji-nida", "UTAFUTA WA NIDA", "Tafuta taarifa za NIDA bila tokeni.", "search", "Huduma za bure"),
+  free("qr-mitandao", "MSIMBO WA QR MITANDAO YOTE", "Tengeneza msimbo wa QR wa mitandao yako.", "qr-code", "Huduma za bure"),
+  paid("brela", "BRELA", "Msaada wa huduma za BRELA.", "landmark", "Huduma kuu"),
+  locked("cheti-kuzaliwa", "CHETI CHA KUZALIWA", "Huduma hii inasubiri kufunguliwa.", "baby", "Huduma zilizofungwa"),
+  locked("visa-pasipoti", "VISA / PASIPOTI", "Huduma hii inasubiri kufunguliwa.", "plane", "Huduma zilizofungwa"),
+  locked("cheti-ndoa", "CHETI CHA NDOA", "Huduma hii inasubiri kufunguliwa.", "heart-handshake", "Huduma zilizofungwa"),
+  locked("ripoti-hasara", "RIPOTI YA HASARA", "Huduma hii inasubiri kufunguliwa.", "file-warning", "Huduma zilizofungwa"),
+  paid("tengeneza-muziki", "TENGENEZA MUZIKI", "Tengeneza wazo la muziki wa kipekee.", "music-2", "Zana za ziada"),
+  paid("tafuta-kvar-picha", "TAFUTA KVAR PICHA", "Tafuta picha kwa matumizi yako.", "image-search", "Zana za ziada"),
+  paid("simu-ya-tafuta", "SIMU YA TAFTA", "Pata msaada wa utafutaji wa simu.", "smartphone", "Zana za ziada"),
+  paid("usuli-wa-ondoa", "USULI WA ONDOA", "Ondoa usuli wa picha.", "scan-face", "Zana za ziada"),
+  paid("wasifu-chonga", "WASIFU WA CHONGA", "Tengeneza wasifu wa kuvutia.", "user-round-pen", "Zana za ziada"),
+  paid("nembo-chonga", "NEMBO YA CHONGA", "Tengeneza wazo la nembo.", "palette", "Zana za ziada"),
+  paid("radio-maria", "RADIO MARIA", "Fungua Radio Maria kwa urahisi.", "radio", "Zana za ziada"),
+  paid("simba-sc", "SIMBA SC", "Habari na huduma za Simba SC.", "trophy", "Zana za ziada"),
+  paid("yanga-africans", "YANGA AFRICANS", "Habari na huduma za Yanga Africans.", "star", "Zana za ziada"),
+  paid("azam-tv", "AZAM TV", "Fungua huduma ya Azam TV.", "tv", "Zana za ziada"),
+];
+
+export const specialServices = [
+  { slug: "tic-tech", name: "JIUNGE NA KIKUNDI CHA TIC TECH (WhatsApp)", tone: "green", action: "whatsapp" },
+  { slug: "kikundi-bure", name: "KIKUNDI LA BURE (Bure)", tone: "green", action: "whatsapp" },
+  { slug: "botani-biashara", name: "LIPIA BATANI YA BIASHARA (Programu ya IONEKANE)", tone: "green", action: "contact" },
+  { slug: "kikundi-vip", name: "KIKUNDI VIP 5,000 (Kulipia)", tone: "yellow", action: "contact" },
+  { slug: "vip-usajili", name: "VIP YA USAJILI (Lipia Mda Mrefu)", tone: "yellow", action: "contact" },
+  { slug: "tangazo", name: "LIPIA TANGAZO LAKO (Litangazwe)", tone: "red", action: "contact" },
+] as const;
+
+export const tutorials: TutorialItem[] = [
+  { slug: "lipa-vodacom", title: "KUSAJILI LIPA NAMBA VODACOM", description: "Jifunze hatua za kusajili Lipa Namba Vodacom.", tokenCost: 2 },
+  { slug: "download-tin", title: "JINSI YA KUDOWNLOAD TIN", description: "Mwongozo wa kupakua cheti cha TIN.", tokenCost: 2 },
+  { slug: "tin-mteja-mpya", title: "KUOMBA TIN MTEJA MPYA", description: "Jinsi ya kumsaidia mteja mpya kuomba TIN.", tokenCost: 2 },
 ];
 
 export const activitySeed: ActivityItem[] = [
-  { service: "Studio ya Ankara", type: "Rasimu ya ankara", credits: 2, status: "Imekamilika", reference: "KD-81A2", createdAt: "2026-09-09T16:25:00.000Z" },
-  { service: "Dawati la Nyaraka", type: "Usafishaji wa maelezo", credits: 3, status: "Imekamilika", reference: "KD-80F4", createdAt: "2026-09-07T09:10:00.000Z" },
-  { service: "Cheche ya Chapa", type: "Mwanzo wa kampeni", credits: 4, status: "Imekamilika", reference: "KD-7D91", createdAt: "2026-09-02T12:40:00.000Z" },
+  { service: "CHETI CHA TIN", type: "Matumizi ya huduma", credits: 2, status: "Imekamilika", reference: "HM-81A2", createdAt: "2026-09-09T16:25:00.000Z" },
+  { service: "NAKALA LAINI YA NIDA", type: "Matumizi ya huduma", credits: 2, status: "Imekamilika", reference: "HM-80F4", createdAt: "2026-09-07T09:10:00.000Z" },
 ];
 
 export function findService(slug: string) {
   return serviceCatalog.find((service) => service.slug === slug);
 }
 
-export function getCatalogIconName(slug: string) {
-  return findService(slug)?.icon ?? "circle-dashed";
-}
-
 export function formatCatalogDate(value: string | Date) {
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+  return new Date(value).toLocaleDateString("sw-TZ", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
