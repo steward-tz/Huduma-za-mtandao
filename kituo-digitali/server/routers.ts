@@ -26,7 +26,7 @@ export const appRouter = router({
       return stored.length > 0
         ? stored.map((run) => ({
             service: run.serviceName,
-            type: "Workbench run",
+            type: "Kazi ya kituo",
             credits: run.credits,
             status: run.status,
             reference: run.reference,
@@ -45,7 +45,7 @@ export const appRouter = router({
         serviceName: service.name,
         brief: input.brief,
         credits: service.credits,
-        status: "Complete",
+        status: "Imekamilika",
         reference,
       });
       return { reference: created?.reference ?? reference, service: service.name };

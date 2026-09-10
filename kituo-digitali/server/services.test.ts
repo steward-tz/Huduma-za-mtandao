@@ -24,7 +24,7 @@ describe("services router", () => {
     const caller = appRouter.createCaller(createPublicContext());
 
     await expect(caller.services.getBySlug({ slug: "brand-spark" })).resolves.toMatchObject({
-      name: "Brand Spark",
+      name: "Cheche ya Chapa",
       credits: 4,
     });
     await expect(caller.services.getBySlug({ slug: "not-a-real-tool" })).resolves.toBeNull();
