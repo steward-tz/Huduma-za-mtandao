@@ -24,6 +24,12 @@ function Router() {
       <Route path={"/admin/transactions"} component={Home} />
       <Route path={"/admin/announcements"} component={Home} />
       <Route path={"/admin/settings"} component={Home} />
+      <Route path={"/admin/roles"} component={Home} />
+      <Route path={"/admin/messages"} component={Home} />
+      <Route path={"/admin/ads"} component={Home} />
+      <Route path={"/admin/analytics"} component={Home} />
+      <Route path={"/admin/appearance"} component={Home} />
+      <Route path={"/admin/audit"} component={Home} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

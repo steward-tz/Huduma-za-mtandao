@@ -1,15 +1,21 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
   adminActions,
+  advertisements,
+  appearanceSettings,
   announcements,
+  messages,
+  permissions,
+  roles,
   notifications,
   serviceRuns,
   serviceUsage,
   services,
   tokenTransactions,
   tutorialVideos,
+  userPermissions,
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
@@ -35,7 +41,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
   if (user.lastSignedIn !== undefined) { values.lastSignedIn = user.lastSignedIn; updateSet.lastSignedIn = user.lastSignedIn; }
   if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; }
-  else if (user.openId === ENV.ownerOpenId) { values.role = "admin"; updateSet.role = "admin"; updateSet.verificationStatus = "approved"; }
+  else if (user.openId === ENV.ownerOpenId) { values.role = "super_admin"; updateSet.role = "super_admin"; updateSet.verificationStatus = "approved"; updateSet.accountStatus = "active"; }
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
   await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
@@ -129,23 +135,26 @@ export async function adjustTokens(input: { adminUserId: number; userId: number;
     await tx.update(users).set({ tokenBalance: balance }).where(eq(users.id, input.userId));
     const reference = `AD-${Math.random().toString(36).slice(2, 9).toUpperCase()}`;
     await tx.insert(tokenTransactions).values({ userId: input.userId, type: input.amount >= 0 ? "addition" : "removal", amount: input.amount, description: input.description, reference, balanceAfter: balance });
-    await tx.insert(adminActions).values({ adminUserId: input.adminUserId, targetUserId: input.userId, action: input.amount >= 0 ? "add_tokens" : "remove_tokens", details: input.description });
+    await tx.insert(adminActions).values({ adminUserId: input.adminUserId, targetUserId: input.userId, action: input.amount >= 0 ? "add_tokens" : "remove_tokens", details: input.description, reason: input.description });
     await tx.insert(notifications).values({ userId: input.userId, title: input.amount >= 0 ? "Tokeni zimeongezwa" : "Tokeni zimeondolewa", message: `${Math.abs(input.amount)} tokeni ${input.amount >= 0 ? "zimeongezwa" : "zimeondolewa"}.`, isRead: 0 });
     return { balance, reference };
   });
 }
 
-export async function listUsers() {
+export async function listUsers(filters?: { search?: string; status?: "active" | "pending" | "blocked" | "deleted" }) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(users).orderBy(desc(users.createdAt)).limit(100);
+  const conditions = [];
+  if (filters?.status) conditions.push(eq(users.accountStatus, filters.status));
+  if (filters?.search) conditions.push(or(like(users.name, `%${filters.search}%`), like(users.phone, `%${filters.search}%`), like(users.email, `%${filters.search}%`)));
+  return db.select().from(users).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(users.createdAt)).limit(100);
 }
 
 export async function updateUserVerification(adminUserId: number, userId: number, status: "approved" | "rejected" | "blocked" | "pending") {
   const db = await getDb();
   if (!db) return undefined;
   await db.update(users).set({ verificationStatus: status }).where(eq(users.id, userId));
-  await db.insert(adminActions).values({ adminUserId, targetUserId: userId, action: `user_${status}`, details: `Mabadiliko ya hali kuwa ${status}` });
+  await db.insert(adminActions).values({ adminUserId, targetUserId: userId, action: `user_${status}`, details: `Mabadiliko ya hali kuwa ${status}`, reason: `Mabadiliko ya hali kuwa ${status}` });
   await db.insert(notifications).values({ userId, title: "Hali ya akaunti imebadilika", message: `Akaunti yako sasa iko katika hali: ${status}.`, isRead: 0 });
   return getUserById(userId);
 }
@@ -157,4 +166,186 @@ export async function listAdminStats() {
   const transactions = await db.select().from(tokenTransactions);
   const usage = await db.select().from(serviceUsage);
   return { totalUsers: allUsers.length, pendingUsers: allUsers.filter((u) => u.verificationStatus === "pending").length, approvedUsers: allUsers.filter((u) => u.verificationStatus === "approved").length, totalTokensIssued: transactions.filter((t) => t.amount > 0).reduce((sum, t) => sum + t.amount, 0), totalTokensUsed: Math.abs(transactions.filter((t) => t.amount < 0).reduce((sum, t) => sum + t.amount, 0)), totalServiceUsage: usage.length };
+}
+
+
+export async function getUserByPhone(phone: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  return (await db.select().from(users).where(eq(users.phone, phone)).limit(1))[0];
+}
+
+export async function createLocalUser(input: { firstName: string; lastName: string; phone: string; pinHash: string }) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const fullName = `${input.firstName} ${input.lastName}`.trim();
+  await db.insert(users).values({ openId: `local:${input.phone}`, firstName: input.firstName, lastName: input.lastName, name: fullName, phone: input.phone, pinHash: input.pinHash, loginMethod: "phone_pin", role: "user", accountStatus: "active", verificationStatus: "pending", tokenBalance: 0, pinChangedAt: new Date() });
+  return getUserByPhone(input.phone);
+}
+
+export async function recordLoginFailure(userId: number, attempts: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ failedLoginAttempts: attempts, lockedUntil: attempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null }).where(eq(users.id, userId));
+}
+
+export async function clearLoginFailures(userId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ failedLoginAttempts: 0, lockedUntil: null, lastSignedIn: new Date() }).where(eq(users.id, userId));
+}
+
+export async function updateUserAccount(userId: number, input: { firstName?: string; lastName?: string; language?: string }) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const patch: Record<string, unknown> = {};
+  if (input.firstName !== undefined) patch.firstName = input.firstName;
+  if (input.lastName !== undefined) patch.lastName = input.lastName;
+  if (input.firstName !== undefined || input.lastName !== undefined) patch.name = `${input.firstName ?? ""} ${input.lastName ?? ""}`.trim();
+  if (input.language !== undefined) patch.language = input.language;
+  if (Object.keys(patch).length) await db.update(users).set(patch).where(eq(users.id, userId));
+  return getUserById(userId);
+}
+
+export async function changeUserPin(userId: number, pinHash: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  await db.update(users).set({ pinHash, pinChangedAt: new Date() }).where(eq(users.id, userId));
+  return true;
+}
+
+export async function setAccountStatus(adminUserId: number, userId: number, status: "active" | "blocked" | "deleted", reason: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  await db.update(users).set({ accountStatus: status, deletedAt: status === "deleted" ? new Date() : null, verificationStatus: status === "blocked" ? "blocked" : "pending" }).where(eq(users.id, userId));
+  await db.insert(adminActions).values({ adminUserId, targetUserId: userId, action: `account_${status}`, details: reason, reason });
+  await db.insert(notifications).values({ userId, title: `Akaunti ${status}`, message: reason, isRead: 0 });
+  return getUserById(userId);
+}
+
+export async function listAllTransactions(limit = 200) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(tokenTransactions).orderBy(desc(tokenTransactions.createdAt)).limit(limit);
+}
+
+export async function getUserMessages(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(messages).where(eq(messages.recipientId, userId)).orderBy(desc(messages.createdAt)).limit(100);
+}
+
+export async function sendMessage(input: { senderId: number; recipientId?: number; subject: string; body: string; isBroadcast?: boolean }) {
+  const db = await getDb();
+  if (!db) return undefined;
+  if (input.isBroadcast) {
+    const all = await db.select({ id: users.id }).from(users).where(eq(users.accountStatus, "active"));
+    for (const recipient of all) {
+      await db.insert(messages).values({ senderId: input.senderId, recipientId: recipient.id, subject: input.subject, body: input.body, isBroadcast: 1, isRead: 0 });
+      await db.insert(notifications).values({ userId: recipient.id, title: input.subject, message: input.body, isRead: 0 });
+    }
+  } else if (input.recipientId) {
+    await db.insert(messages).values({ senderId: input.senderId, recipientId: input.recipientId, subject: input.subject, body: input.body, isBroadcast: 0, isRead: 0 });
+    await db.insert(notifications).values({ userId: input.recipientId, title: input.subject, message: input.body, isRead: 0 });
+  }
+  return true;
+}
+
+export async function listAdvertisements() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(advertisements).orderBy(desc(advertisements.createdAt)).limit(100);
+}
+
+export async function saveAdvertisement(input: { adminUserId: number; id?: number; title: string; description: string; imageUrl?: string; linkUrl?: string; status: string }) {
+  const db = await getDb();
+  if (!db) return undefined;
+  if (input.id) await db.update(advertisements).set({ title: input.title, description: input.description, imageUrl: input.imageUrl, linkUrl: input.linkUrl, status: input.status }).where(eq(advertisements.id, input.id));
+  else await db.insert(advertisements).values({ createdBy: input.adminUserId, title: input.title, description: input.description, imageUrl: input.imageUrl, linkUrl: input.linkUrl, status: input.status });
+  await db.insert(adminActions).values({ adminUserId: input.adminUserId, action: input.id ? "advertisement_update" : "advertisement_create", details: `${input.title}`, reason: `${input.title}` });
+  return true;
+}
+
+export async function getAnalytics() {
+  const db = await getDb();
+  if (!db) return { daily: [], weekly: [], monthly: [], popular: [] };
+  const usage = await db.select().from(serviceUsage).orderBy(desc(serviceUsage.createdAt)).limit(1000);
+  const counts = new Map<string, number>();
+  for (const row of usage) counts.set(row.serviceName, (counts.get(row.serviceName) ?? 0) + 1);
+  return { daily: usage.slice(0, 30), weekly: usage.slice(0, 100), monthly: usage, popular: Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([service, count]) => ({ service, count })) };
+}
+
+
+export async function saveService(input: { adminUserId: number; id?: number; slug: string; name: string; description: string; icon: string; tokenCost: number; isFree: boolean; isLocked: boolean; category: string; sortOrder: number }) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const values = { slug: input.slug, name: input.name, description: input.description, icon: input.icon, tokenCost: input.tokenCost, isFree: input.isFree ? 1 : 0, isLocked: input.isLocked ? 1 : 0, category: input.category, sortOrder: input.sortOrder };
+  if (input.id) await db.update(services).set(values).where(eq(services.id, input.id));
+  else await db.insert(services).values(values);
+  await db.insert(adminActions).values({ adminUserId: input.adminUserId, action: input.id ? "service_update" : "service_create", details: `${input.name}`, reason: `${input.name}` });
+  return true;
+}
+
+export async function deleteService(adminUserId: number, id: number, reason: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  await db.delete(services).where(eq(services.id, id));
+  await db.insert(adminActions).values({ adminUserId, action: "service_delete", details: reason, reason });
+  return true;
+}
+
+export async function getAppearance() {
+  const db = await getDb();
+  if (!db) return undefined;
+  return (await db.select().from(appearanceSettings).limit(1))[0];
+}
+
+export async function saveAppearance(input: { adminUserId: number; websiteName: string; primaryColor: string; secondaryColor: string; backgroundColor: string; textColor: string; borderRadius: number; darkMode: boolean }) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const values = { websiteName: input.websiteName, primaryColor: input.primaryColor, secondaryColor: input.secondaryColor, backgroundColor: input.backgroundColor, textColor: input.textColor, borderRadius: input.borderRadius, darkMode: input.darkMode ? 1 : 0, updatedBy: input.adminUserId };
+  const current = await getAppearance();
+  if (current) await db.update(appearanceSettings).set(values).where(eq(appearanceSettings.id, current.id));
+  else await db.insert(appearanceSettings).values(values);
+  await db.insert(adminActions).values({ adminUserId: input.adminUserId, action: "appearance_update", details: input.websiteName, reason: "Mabadiliko ya appearance" });
+  return getAppearance();
+}
+
+export async function listAuditActions(limit = 200) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(adminActions).orderBy(desc(adminActions.createdAt)).limit(limit);
+}
+
+export async function listRolesAndPermissions() {
+  const db = await getDb();
+  if (!db) return { roles: [], permissions: [] };
+  const roleRows = await db.select().from(roles);
+  const permissionRows = await db.select().from(permissions);
+  return { roles: roleRows, permissions: permissionRows };
+}
+
+export async function grantUserPermission(input: { adminUserId: number; userId: number; permissionId: number }) {
+  const db = await getDb();
+  if (!db) return undefined;
+  await db.insert(userPermissions).values({ userId: input.userId, permissionId: input.permissionId, grantedBy: input.adminUserId });
+  await db.insert(adminActions).values({ adminUserId: input.adminUserId, targetUserId: input.userId, action: "permission_grant", details: `Permission ${input.permissionId}`, reason: "Permission imetolewa" });
+  return true;
+}
+
+
+export async function setUserRole(adminUserId: number, userId: number, role: "super_admin" | "admin" | "moderator" | "support" | "user", reason: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  await db.update(users).set({ role }).where(eq(users.id, userId));
+  await db.insert(adminActions).values({ adminUserId, targetUserId: userId, action: "role_change", details: `${role}: ${reason}`, reason });
+  return getUserById(userId);
+}
+
+export async function resetUserPin(adminUserId: number, userId: number, pinHash: string, reason: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  await db.update(users).set({ pinHash, pinChangedAt: new Date(), failedLoginAttempts: 0, lockedUntil: null }).where(eq(users.id, userId));
+  await db.insert(adminActions).values({ adminUserId, targetUserId: userId, action: "pin_reset", details: reason, reason });
+  return true;
 }

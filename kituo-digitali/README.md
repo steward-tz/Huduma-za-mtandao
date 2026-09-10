@@ -1,49 +1,66 @@
 # HUDUMA ZA MTANDAONI
 
-HUDUMA ZA MTANDAONI ni full-stack web application ya Kiswahili inayokusanya huduma za kidigitali, mfumo wa tokeni, mafunzo, historia ya matumizi na paneli ya admin katika portal moja ya mobile-first.
+HUDUMA ZA MTANDAONI ni full-stack application ya Kiswahili ya kusimamia huduma za kidijitali, tokeni, watumiaji, miamala, ujumbe, matangazo na usimamizi wa mfumo. Project imejengwa kwa React + Vite + Tailwind, Express + tRPC, Drizzle ORM na MySQL/TiDB.
 
-## Kilichojengwa
+## Vipengele vya production
 
-- Muonekano wa mobile-first unaofanya kazi kwenye Android, iPhone, tablet na desktop.
-- Banner nyekundu ya tangazo, search ya huduma, white cards, vitufe vya kijani, VIP cards za njano na matangazo mekundu.
-- Huduma kuu: TIN, NIDA, LIPA, mpiga kura, leseni, BRELA na nyingine.
-- Huduma za bure ambazo hazikati tokeni.
-- Huduma zilizofungwa zenye ujumbe wa wazi bila kukata tokeni.
-- Huduma maalum za WhatsApp, VIP na matangazo ya biashara.
-- Video za mafunzo zilizoandaliwa kwa URL halisi inayoweza kuongezwa na admin; hakuna video URL bandia.
-- Mfumo wa tokeni wa backend: akaunti mpya huanza na tokeni 0, huduma zinazolipiwa hukata tokeni 2, na huduma za bure hukata 0.
-- Ulinzi wa verification status, token balance, transaction history, service usage, notifications na audit actions.
-- Admin dashboard yenye route za `/admin`, `/admin/users`, `/admin/tokens`, `/admin/services`, `/admin/videos`, `/admin/transactions`, `/admin/announcements` na `/admin/settings`.
-- OAuth ya Manus ndiyo authentication provider ya msingi; kuingia mara ya kwanza hufanya kazi kama usajili wa akaunti. Admin ndiye huidhinisha akaunti kabla ya huduma za kulipia kutumika.
+- Usajili wa mtumiaji kwa jina, simu na PIN ya tarakimu sita.
+- PIN haihifadhiwi plain text; inatumia salted `scrypt` hash na secure comparison.
+- Login ya simu/PIN, session cookie ya HTTP-only, lockout baada ya majaribio matano na logout ya sessions zote.
+- Manus OAuth bado ipo kama njia mbadala ya authentication.
+- User isolation kupitia `protectedProcedure`: profile, tokeni, history, notifications na ujumbe huonekana kwa mmiliki pekee.
+- Roles tano: `super_admin`, `admin`, `moderator`, `support`, `user`.
+- Tables za roles, permissions, role permissions na user permissions kwa granular access control.
+- Admin user management: approval, block/unblock, delete status, token adjustments, role changes na audited PIN reset.
+- Service management: kuongeza na kusimamia huduma, gharama ya tokeni, icon, category, order na lock status.
+- Token ledger yenye balance-after, references, operator, status na usage history.
+- Transaction management, service analytics, popular-services reporting na audit logs.
+- Messaging ya user mmoja au broadcast kwa users wote pamoja na notifications.
+- Advertisement management yenye title, description, image/link URL, status na audit trail.
+- Language catalog iliyoanza na Kiswahili na English; user language preference imehifadhiwa.
+- Appearance settings: website name, colors, border radius na dark mode, zinazoweza kusomwa na public shell.
+- Responsive user na admin dashboards kwa simu, tablet na desktop.
+- Netlify SPA routing kupitia `netlify.toml` na `client/public/_redirects`.
 
-## Stack
-
-- React 19 + Vite + Tailwind 4
-- Express + tRPC 11
-- Drizzle ORM + MySQL/TiDB
-- Manus OAuth na protected/admin procedures
-- Vitest kwa backend contract tests
-
-## Kuendesha locally
+## Kuendesha local
 
 ```bash
+cd kituo-digitali
 pnpm install
 pnpm dev
+```
+
+Production validation:
+
+```bash
 pnpm check
 pnpm test
 pnpm build
 ```
 
-Usiweke `.env` au API keys kwenye GitHub. Environment variables hutolewa na runtime ya Manus/WebDev au setup yako binafsi ya deployment.
+## Database
 
-## Backend flow
+Schema iko `drizzle/schema.ts`. Migrations ziko `drizzle/` na migration ya production feature set ni `0004_natural_human_fly.sql`. Usibadilishe database moja kwa moja bila kuongeza schema na migration inayoweza kufuatiliwa.
 
-`drizzle/schema.ts` ina tables za users, services, service runs, token transactions, service usage, tutorial videos, notifications, announcements na admin actions. `server/db.ts` ndiyo layer ya database. `server/routers.ts` ndiyo contract ya tRPC. Deduction ya tokeni hufanyika server-side ndani ya transaction na ina audit reference.
+Tables kuu ni `users`, `roles`, `permissions`, `rolePermissions`, `userPermissions`, `services`, `serviceRuns`, `serviceUsage`, `tokenTransactions`, `messages`, `notifications`, `advertisements`, `languages`, `appearanceSettings`, `systemSettings` na `adminActions`.
 
-## Kupanua mfumo
+## Security
 
-Ongeza huduma mpya kwenye `shared/catalog.ts`, kisha ongeza action URL halisi au procedure inayohitajika kwenye backend. Kwa video, tumia URL halisi inayodhibitiwa na admin. Kwa malipo, tumia provider halisi na usionyeshe mafanikio ya malipo kabla provider hajathibitisha transaction.
+Usiweke admin PIN au credentials ndani ya React, HTML, GitHub au source code. Owner wa Manus OAuth anapewa `super_admin` wakati wa upsert ya backend kupitia server configuration. Kwa local phone/PIN auth, tumia environment secret `JWT_SECRET` yenye thamani ya production na badilisha PIN baada ya account ya kwanza kutengenezwa.
 
-## Footer
+Admin actions zinahifadhi admin, target, action, reason, legacy details, timestamp na sehemu za IP/user agent pale zinapopatikana. Financial records hazipaswi kuhaririwa bila operation mpya yenye authorization na audit trail.
 
-Programu hii ilitengenezwa na Bw. Zoom Cotex Limited.
+## Netlify
+
+Kwa repository layout hii, Netlify settings zinapaswa kuwa:
+
+- Base directory: `kituo-digitali`
+- Build command: `pnpm build`
+- Publish directory: `dist/public`
+- Node version: `22`
+
+`netlify.toml` ya root na `kituo-digitali/client/public/_redirects` zimesanidiwa kwa client-side routes. Frontend inaweza kuhudumiwa na Netlify; backend ya Express/tRPC na database vinahitaji runtime yenye server support au functions zenye API integration.
+
+## GitHub workflow
+
+GitHub ndiyo source of truth. Fanya mabadiliko kwa commits zenye maana, hakikisha `pnpm check`, `pnpm test` na `pnpm build` zinapita, kisha push branch ya `main` au pull request. Usicommit `.env`, secrets, `node_modules` au `dist`.
