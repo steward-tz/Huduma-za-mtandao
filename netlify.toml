@@ -1,0 +1,17 @@
+[build]
+  base = "kituo-digitali"
+  command = "pnpm build"
+  publish = "dist/public"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# SPA fallback: send client-side routes to the Vite-generated index.html.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[dev]
+  framework = "vite"
+  targetPort = 3000
