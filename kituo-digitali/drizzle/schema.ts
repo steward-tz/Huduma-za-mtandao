@@ -6,6 +6,7 @@ export const users = mysqlTable("users", {
   firstName: varchar("firstName", { length: 80 }),
   lastName: varchar("lastName", { length: 80 }),
   name: text("name"),
+  profileImageUrl: text("profileImageUrl"),
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 32 }).unique(),
   pinHash: varchar("pinHash", { length: 255 }),

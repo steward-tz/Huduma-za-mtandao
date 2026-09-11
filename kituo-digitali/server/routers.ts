@@ -4,6 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { storagePut } from "./storage";
 import {
   adjustTokens,
   changeUserPin,
@@ -91,7 +92,15 @@ export const appRouter = router({
     }),
     notifications: protectedProcedure.query(({ ctx }) => getNotifications(ctx.user.id)),
     messages: protectedProcedure.query(({ ctx }) => getUserMessages(ctx.user.id)),
-    updateProfile: protectedProcedure.input(z.object({ firstName: z.string().trim().min(2).max(80).optional(), lastName: z.string().trim().min(2).max(80).optional(), language: z.enum(["sw", "en"]).optional() })).mutation(({ ctx, input }) => updateUserAccount(ctx.user.id, input)),
+    updateProfile: protectedProcedure.input(z.object({ firstName: z.string().trim().min(2).max(80).optional(), lastName: z.string().trim().min(2).max(80).optional(), language: z.enum(["sw", "en"]).optional(), profileImageUrl: z.string().url().nullable().optional() })).mutation(({ ctx, input }) => updateUserAccount(ctx.user.id, input)),
+    uploadProfileImage: protectedProcedure.input(z.object({ dataUrl: z.string().max(3_000_000) })).mutation(async ({ ctx, input }) => {
+      const match = input.dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
+      if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "Chagua picha ya JPG, PNG au WebP." });
+      const buffer = Buffer.from(match[2], "base64");
+      if (buffer.length > 2 * 1024 * 1024) throw new TRPCError({ code: "BAD_REQUEST", message: "Picha isizidi MB 2." });
+      const stored = await storagePut(`profiles/${ctx.user.id}.image`, buffer, match[1]);
+      return updateUserAccount(ctx.user.id, { profileImageUrl: stored.url });
+    }),
     changePin: protectedProcedure.input(z.object({ currentPin: z.string(), newPin: z.string(), confirmPin: z.string() })).mutation(async ({ ctx, input }) => {
       if (!validatePin(input.newPin) || input.newPin !== input.confirmPin) throw new TRPCError({ code: "BAD_REQUEST", message: "PIN mpya lazima iwe tarakimu 6 na zifanane." });
       const user = await getUserByPhone(ctx.user.phone ?? "");

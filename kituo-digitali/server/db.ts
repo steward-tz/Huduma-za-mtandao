@@ -195,7 +195,7 @@ export async function clearLoginFailures(userId: number) {
   await db.update(users).set({ failedLoginAttempts: 0, lockedUntil: null, lastSignedIn: new Date() }).where(eq(users.id, userId));
 }
 
-export async function updateUserAccount(userId: number, input: { firstName?: string; lastName?: string; language?: string }) {
+export async function updateUserAccount(userId: number, input: { firstName?: string; lastName?: string; language?: string; profileImageUrl?: string | null }) {
   const db = await getDb();
   if (!db) return undefined;
   const patch: Record<string, unknown> = {};
@@ -203,6 +203,7 @@ export async function updateUserAccount(userId: number, input: { firstName?: str
   if (input.lastName !== undefined) patch.lastName = input.lastName;
   if (input.firstName !== undefined || input.lastName !== undefined) patch.name = `${input.firstName ?? ""} ${input.lastName ?? ""}`.trim();
   if (input.language !== undefined) patch.language = input.language;
+  if (input.profileImageUrl !== undefined) patch.profileImageUrl = input.profileImageUrl;
   if (Object.keys(patch).length) await db.update(users).set(patch).where(eq(users.id, userId));
   return getUserById(userId);
 }
