@@ -4,15 +4,17 @@ import { SignJWT, jwtVerify } from "jose";
 
 const scrypt = promisify(nodeScrypt);
 const LOCAL_COOKIE = "huduma_local_session";
+if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) throw new Error("JWT_SECRET is required in production");
 const secret = new TextEncoder().encode(process.env.JWT_SECRET || "development-only-change-me");
 
 export function localCookieName() { return LOCAL_COOKIE; }
 
 export function normalizePhone(phone: string) {
   const compact = phone.replace(/[\s()-]/g, "");
-  if (/^0\d{9}$/.test(compact)) return `255${compact.slice(1)}`;
-  if (/^255\d{9}$/.test(compact)) return compact;
-  throw new Error("Namba ya simu si sahihi. Tumia mfano 0698232313.");
+  const validPrefixes = ["061", "062", "063", "067", "068", "069", "070", "071", "073", "075", "077", "078", "079"];
+  if (/^0\d{9}$/.test(compact) && validPrefixes.some((prefix) => compact.startsWith(prefix))) return `255${compact.slice(1)}`;
+  if (/^255\d{9}$/.test(compact) && validPrefixes.some((prefix) => compact.startsWith(`255${prefix.slice(1)}`))) return compact;
+  throw new Error("Namba ya simu si sahihi. Tumia mfano 07XXXXXXXX.");
 }
 
 export function validatePin(pin: string) {
@@ -49,6 +51,17 @@ export async function verifyLocalSession(token: string) {
   } catch {
     return null;
   }
+}
+
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+
+export function checkLoginRateLimit(key: string) {
+  const now = Date.now();
+  const current = loginAttempts.get(key);
+  if (!current || current.resetAt <= now) { loginAttempts.set(key, { count: 1, resetAt: now + 15 * 60 * 1000 }); return true; }
+  if (current.count >= 20) return false;
+  current.count += 1;
+  return true;
 }
 
 export function localSessionCookieOptions() {

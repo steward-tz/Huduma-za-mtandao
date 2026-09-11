@@ -30,6 +30,7 @@ import {
   listAdminStats,
   listUsers,
   recordLoginFailure,
+  requestPinReset,
   saveAdvertisement,
   saveAppearance,
   saveService,
@@ -42,7 +43,7 @@ import {
   setUserRole,
 } from "./db";
 import { TRPCError } from "@trpc/server";
-import { hashPin, localCookieName, localSessionCookieOptions, normalizePhone, signLocalSession, validatePin, verifyPin } from "./_core/localAuth";
+import { checkLoginRateLimit, hashPin, localCookieName, localSessionCookieOptions, normalizePhone, signLocalSession, validatePin, verifyPin } from "./_core/localAuth";
 
 export const appRouter = router({
   system: systemRouter,
@@ -59,6 +60,8 @@ export const appRouter = router({
       return { id: user.id, name: user.name, phone: user.phone, status: user.verificationStatus };
     }),
     login: publicProcedure.input(z.object({ phone: z.string().trim(), pin: z.string() })).mutation(async ({ ctx, input }) => {
+      const rateKey = `${ctx.req.ip ?? "unknown"}:${input.phone.slice(-9)}`;
+      if (!checkLoginRateLimit(rateKey)) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Majaribio mengi ya kuingia. Jaribu tena baada ya dakika 15." });
       let phone: string;
       try { phone = normalizePhone(input.phone); } catch { throw new TRPCError({ code: "BAD_REQUEST", message: "Namba ya simu si sahihi." }); }
       const user = await getUserByPhone(phone);
@@ -70,6 +73,10 @@ export const appRouter = router({
       await clearLoginFailures(user.id);
       ctx.res.cookie(localCookieName(), await signLocalSession(user.id), localSessionCookieOptions());
       return { id: user.id, name: user.name, phone: user.phone, role: user.role };
+    }),
+    requestPinReset: publicProcedure.input(z.object({ phone: z.string().trim() })).mutation(async ({ input }) => {
+      try { await requestPinReset(normalizePhone(input.phone)); } catch { /* Keep reset responses generic to avoid account enumeration. */ }
+      return { success: true } as const;
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);

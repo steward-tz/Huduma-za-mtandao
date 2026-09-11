@@ -19,6 +19,7 @@ import {
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { normalizePhone } from "./_core/localAuth";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -35,13 +36,14 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   if (!db) return;
   const values: InsertUser = { openId: user.openId };
   const updateSet: Record<string, unknown> = {};
+  const normalizedPhone = user.phone ? (() => { try { return normalizePhone(user.phone); } catch { return user.phone; } })() : undefined;
   const textFields = ["name", "email", "phone", "loginMethod"] as const;
   for (const field of textFields) {
-    if (user[field] !== undefined) { values[field] = user[field] ?? null; updateSet[field] = user[field] ?? null; }
+    if (user[field] !== undefined) { const value = field === "phone" ? normalizedPhone : user[field]; values[field] = value ?? null; updateSet[field] = value ?? null; }
   }
   if (user.lastSignedIn !== undefined) { values.lastSignedIn = user.lastSignedIn; updateSet.lastSignedIn = user.lastSignedIn; }
   if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; }
-  else if (user.openId === ENV.ownerOpenId) { values.role = "super_admin"; updateSet.role = "super_admin"; updateSet.verificationStatus = "approved"; updateSet.accountStatus = "active"; }
+  else if (user.openId === ENV.ownerOpenId || normalizedPhone === ENV.superAdminPhone) { values.role = "super_admin"; updateSet.role = "super_admin"; updateSet.verificationStatus = "approved"; updateSet.accountStatus = "active"; }
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
   await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
@@ -179,7 +181,7 @@ export async function createLocalUser(input: { firstName: string; lastName: stri
   const db = await getDb();
   if (!db) return undefined;
   const fullName = `${input.firstName} ${input.lastName}`.trim();
-  await db.insert(users).values({ openId: `local:${input.phone}`, firstName: input.firstName, lastName: input.lastName, name: fullName, phone: input.phone, pinHash: input.pinHash, loginMethod: "phone_pin", role: "user", accountStatus: "active", verificationStatus: "pending", tokenBalance: 0, pinChangedAt: new Date() });
+  await db.insert(users).values({ openId: `local:${input.phone}`, firstName: input.firstName, lastName: input.lastName, name: fullName, phone: input.phone, pinHash: input.pinHash, loginMethod: "phone_pin", role: input.phone === ENV.superAdminPhone ? "super_admin" : "user", accountStatus: "active", verificationStatus: input.phone === ENV.superAdminPhone ? "approved" : "pending", tokenBalance: 0, pinChangedAt: new Date() });
   return getUserByPhone(input.phone);
 }
 
@@ -206,6 +208,18 @@ export async function updateUserAccount(userId: number, input: { firstName?: str
   if (input.profileImageUrl !== undefined) patch.profileImageUrl = input.profileImageUrl;
   if (Object.keys(patch).length) await db.update(users).set(patch).where(eq(users.id, userId));
   return getUserById(userId);
+}
+
+
+export async function requestPinReset(phone: string) {
+  const db = await getDb();
+  if (!db) return;
+  const user = await getUserByPhone(phone);
+  if (!user) return;
+  const admins = await db.select({ id: users.id }).from(users).where(and(eq(users.role, "super_admin"), eq(users.accountStatus, "active")));
+  for (const admin of admins) {
+    await db.insert(notifications).values({ userId: admin.id, title: "Ombi la reset PIN", message: `Mtumiaji ${user.firstName ?? ""} ${user.lastName ?? ""} ameomba kusaidiwa kubadilisha PIN. Tumia Admin > Users > Reset PIN.`, isRead: 0 });
+  }
 }
 
 export async function changeUserPin(userId: number, pinHash: string) {

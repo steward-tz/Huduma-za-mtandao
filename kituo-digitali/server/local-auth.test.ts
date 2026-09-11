@@ -9,6 +9,8 @@ describe("local phone and PIN security", () => {
 
   it("rejects invalid phone and PIN formats", () => {
     expect(() => normalizePhone("12345")).toThrow();
+    expect(() => normalizePhone("0648232313")).toThrow();
+    expect(() => normalizePhone("254698232313")).toThrow();
     expect(validatePin("123456")).toBe(true);
     expect(validatePin("12345")).toBe(false);
     expect(validatePin("abcdef")).toBe(false);
