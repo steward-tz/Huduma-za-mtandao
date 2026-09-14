@@ -3,7 +3,7 @@ import { activitySeed, announcementText, findService, serviceCatalog, tutorials 
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, adminPermissionProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
 import {
   adjustTokens,
@@ -16,6 +16,8 @@ import {
   getAnnouncement,
   getNotifications,
   getProfile,
+  getServices,
+  getServiceBySlug,
   getRecentServiceRuns,
   getTokenTransactions,
   getTutorialVideos,
@@ -88,7 +90,7 @@ export const appRouter = router({
   portal: router({
     announcement: publicProcedure.query(async () => (await getAnnouncement())?.message ?? announcementText),
     appearance: publicProcedure.query(() => getAppearance()),
-    services: publicProcedure.query(() => serviceCatalog),
+    services: publicProcedure.query(async () => { const stored = await getServices(); return stored.length ? stored.map((item) => ({ ...item, kind: item.isLocked ? "locked" : item.isFree ? "free" : "paid" })) : serviceCatalog; }),
     tutorials: publicProcedure.query(async () => {
       const stored = await getTutorialVideos();
       return stored.length ? stored : tutorials;
@@ -121,7 +123,8 @@ export const appRouter = router({
       return stored.length ? stored.map((run) => ({ service: run.serviceName, type: "Matumizi ya huduma", credits: run.credits, status: run.status, reference: run.reference, createdAt: run.createdAt })) : activitySeed;
     }),
     useService: protectedProcedure.input(z.object({ serviceSlug: z.string(), brief: z.string().max(5000).optional() })).mutation(async ({ ctx, input }) => {
-      const service = findService(input.serviceSlug);
+      const storedService = await getServiceBySlug(input.serviceSlug);
+      const service = storedService ? { ...storedService, kind: storedService.isLocked ? "locked" : storedService.isFree ? "free" : "paid" } : findService(input.serviceSlug);
       if (!service) throw new TRPCError({ code: "NOT_FOUND", message: "Huduma haijapatikana." });
       if (service.kind === "locked") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Huduma hii imefungwa kwa sasa." });
       const cost = service.tokenCost;
@@ -140,8 +143,8 @@ export const appRouter = router({
     stats: adminProcedure.query(() => listAdminStats()),
     users: adminProcedure.input(z.object({ search: z.string().optional(), status: z.enum(["active", "pending", "blocked", "deleted"]).optional() }).optional()).query(({ input }) => listUsers(input)),
     verifyUser: adminProcedure.input(z.object({ userId: z.number(), status: z.enum(["approved", "rejected", "blocked", "pending"]) })).mutation(({ ctx, input }) => updateUserVerification(ctx.user.id, input.userId, input.status)),
-    adjustTokens: adminProcedure.input(z.object({ userId: z.number(), amount: z.number().int().min(-100000).max(100000), description: z.string().min(3).max(300) })).mutation(({ ctx, input }) => adjustTokens({ adminUserId: ctx.user.id, userId: input.userId, amount: input.amount, description: input.description })),
-    services: adminProcedure.query(() => serviceCatalog),
+    adjustTokens: adminPermissionProcedure("tokens.manage").input(z.object({ userId: z.number(), amount: z.number().int().min(-100000).max(100000), description: z.string().min(3).max(300) })).mutation(({ ctx, input }) => adjustTokens({ adminUserId: ctx.user.id, userId: input.userId, amount: input.amount, description: input.description })),
+    services: adminProcedure.query(async () => { const stored = await getServices(); return stored.length ? stored : serviceCatalog; }),
     analytics: adminProcedure.query(() => getAnalytics()),
     transactions: adminProcedure.query(() => listAllTransactions()),
     messages: adminProcedure.query(({ ctx }) => getUserMessages(ctx.user.id)),
@@ -149,15 +152,15 @@ export const appRouter = router({
     advertisements: adminProcedure.query(() => listAdvertisements()),
     saveAdvertisement: adminProcedure.input(z.object({ id: z.number().optional(), title: z.string().min(2).max(180), description: z.string().min(2).max(5000), imageUrl: z.string().url().optional(), linkUrl: z.string().url().optional(), status: z.enum(["draft", "active", "paused", "expired"]) })).mutation(({ ctx, input }) => saveAdvertisement({ adminUserId: ctx.user.id, ...input })),
     setAccountStatus: adminProcedure.input(z.object({ userId: z.number(), status: z.enum(["active", "blocked", "deleted"]), reason: z.string().min(3).max(500) })).mutation(({ ctx, input }) => setAccountStatus(ctx.user.id, input.userId, input.status, input.reason)),
-    setUserRole: adminProcedure.input(z.object({ userId: z.number(), role: z.enum(["super_admin", "admin", "moderator", "support", "user"]), reason: z.string().min(3).max(500) })).mutation(({ ctx, input }) => setUserRole(ctx.user.id, input.userId, input.role, input.reason)),
+    setUserRole: adminPermissionProcedure("users.roles").input(z.object({ userId: z.number(), role: z.enum(["super_admin", "admin", "moderator", "support", "user"]), reason: z.string().min(3).max(500) })).mutation(({ ctx, input }) => setUserRole(ctx.user.id, input.userId, input.role, input.reason)),
     resetUserPin: adminProcedure.input(z.object({ userId: z.number(), newPin: z.string(), reason: z.string().min(3).max(500) })).mutation(async ({ ctx, input }) => { if (!validatePin(input.newPin)) throw new TRPCError({ code: "BAD_REQUEST", message: "PIN lazima iwe tarakimu 6." }); return resetUserPin(ctx.user.id, input.userId, await hashPin(input.newPin), input.reason); }),
-    servicesCatalog: adminProcedure.query(() => serviceCatalog),
-    saveService: adminProcedure.input(z.object({ id: z.number().optional(), slug: z.string().min(2).max(100), name: z.string().min(2).max(180), description: z.string().min(2).max(5000), icon: z.string().min(1).max(80), tokenCost: z.number().int().min(0).max(100000), isFree: z.boolean(), isLocked: z.boolean(), category: z.string().min(2).max(100), sortOrder: z.number().int().min(0).max(10000) })).mutation(({ ctx, input }) => saveService({ adminUserId: ctx.user.id, ...input })),
-    deleteService: adminProcedure.input(z.object({ id: z.number(), reason: z.string().min(3).max(500) })).mutation(({ ctx, input }) => deleteService(ctx.user.id, input.id, input.reason)),
+    servicesCatalog: adminProcedure.query(async () => { const stored = await getServices(); return stored.length ? stored : serviceCatalog; }),
+    saveService: adminPermissionProcedure("services.manage").input(z.object({ id: z.number().optional(), slug: z.string().min(2).max(100), name: z.string().min(2).max(180), description: z.string().min(2).max(5000), icon: z.string().min(1).max(80), tokenCost: z.number().int().min(0).max(100000), isFree: z.boolean(), isLocked: z.boolean(), category: z.string().min(2).max(100), sortOrder: z.number().int().min(0).max(10000), isVisible: z.boolean().optional(), isFeatured: z.boolean().optional() })).mutation(({ ctx, input }) => saveService({ adminUserId: ctx.user.id, ...input })),
+    deleteService: adminPermissionProcedure("services.manage").input(z.object({ id: z.number(), reason: z.string().min(3).max(500) })).mutation(({ ctx, input }) => deleteService(ctx.user.id, input.id, input.reason)),
     appearance: adminProcedure.query(() => getAppearance()),
     saveAppearance: adminProcedure.input(z.object({ websiteName: z.string().min(2).max(180), primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/), secondaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/), backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/), textColor: z.string().regex(/^#[0-9a-fA-F]{6}$/), borderRadius: z.number().int().min(0).max(40), darkMode: z.boolean() })).mutation(({ ctx, input }) => saveAppearance({ adminUserId: ctx.user.id, ...input })),
     roles: adminProcedure.query(() => listRolesAndPermissions()),
-    grantPermission: adminProcedure.input(z.object({ userId: z.number(), permissionId: z.number() })).mutation(({ ctx, input }) => grantUserPermission({ adminUserId: ctx.user.id, ...input })),
+    grantPermission: adminPermissionProcedure("users.permissions").input(z.object({ userId: z.number(), permissionId: z.number() })).mutation(({ ctx, input }) => grantUserPermission({ adminUserId: ctx.user.id, ...input })),
     auditLogs: adminProcedure.query(() => listAuditActions()),
   }),
 });

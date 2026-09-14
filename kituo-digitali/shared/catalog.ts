@@ -28,10 +28,8 @@ export type TutorialItem = {
   videoUrl?: string;
 };
 
-export const announcementText = "Wasiliana na 0698232313 kwa huduma za tokeni n.k";
-export const whatsappNumber = "255698232313";
-export const whatsappMessage = "Habari $teward Tz, nataka kununua tokeni. Namba yangu ni 0723232323.";
-export const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+export const announcementText = "Wasiliana na admin kupitia akaunti yako kwa huduma za tokeni.";
+export const whatsappUrl = "/account";
 
 const paid = (slug: string, name: string, description: string, icon: string, category: string): ServiceCatalogItem => ({ slug, name, description, icon, category, tokenCost: 2, kind: "paid" });
 const free = (slug: string, name: string, description: string, icon: string, category: string): ServiceCatalogItem => ({ slug, name, description, icon, category, tokenCost: 0, kind: "free" });

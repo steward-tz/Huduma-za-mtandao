@@ -21,7 +21,7 @@ describe("HUDUMA ZA MTANDAONI portal", () => {
 
   it("returns announcement text and tutorials without fake video URLs", async () => {
     const caller = appRouter.createCaller(createPublicContext());
-    expect(await caller.portal.announcement()).toContain("0698232313");
+    expect(await caller.portal.announcement()).not.toContain("0698232313");
     const tutorials = await caller.portal.tutorials();
     expect(tutorials).toHaveLength(3);
     expect(tutorials.every((tutorial) => !tutorial.videoUrl)).toBe(true);

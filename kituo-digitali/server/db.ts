@@ -83,6 +83,18 @@ export async function getProfile(userId: number) {
   return getUserById(userId);
 }
 
+export async function getServices() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(services).where(eq(services.isVisible, 1)).orderBy(services.sortOrder);
+}
+
+export async function getServiceBySlug(slug: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  return (await db.select().from(services).where(and(eq(services.slug, slug), eq(services.isVisible, 1))).limit(1))[0];
+}
+
 export async function getTokenTransactions(userId: number, limit = 50) {
   const db = await getDb();
   if (!db) return [];
@@ -121,7 +133,7 @@ export async function consumeTokens(input: { userId: number; serviceSlug: string
     const profile = (await tx.select({ tokenBalance: users.tokenBalance }).from(users).where(eq(users.id, input.userId)).limit(1))[0];
     const reference = `TK-${Math.random().toString(36).slice(2, 9).toUpperCase()}`;
     const usageReference = `US-${Math.random().toString(36).slice(2, 9).toUpperCase()}`;
-    await tx.insert(tokenTransactions).values({ userId: input.userId, type: "deduction", amount: -input.cost, serviceSlug: input.serviceSlug, description: input.description, reference, balanceAfter: profile?.tokenBalance ?? 0 });
+    await tx.insert(tokenTransactions).values({ userId: input.userId, type: "deduction", amount: -input.cost, serviceSlug: input.serviceSlug, description: input.description, reference, balanceBefore: current.tokenBalance, balanceAfter: profile?.tokenBalance ?? 0 });
     await tx.insert(serviceUsage).values({ userId: input.userId, serviceSlug: input.serviceSlug, serviceName: input.serviceName, tokensUsed: input.cost, reference: usageReference });
     await tx.insert(notifications).values({ userId: input.userId, title: "Tokeni zimetumika", message: `Tokeni ${input.cost} zimetumika kwenye ${input.serviceName}.`, isRead: 0 });
     return { ok: true as const, balance: profile?.tokenBalance ?? 0, reference };
@@ -136,7 +148,7 @@ export async function adjustTokens(input: { adminUserId: number; userId: number;
     const balance = Math.max(0, (current?.tokenBalance ?? 0) + input.amount);
     await tx.update(users).set({ tokenBalance: balance }).where(eq(users.id, input.userId));
     const reference = `AD-${Math.random().toString(36).slice(2, 9).toUpperCase()}`;
-    await tx.insert(tokenTransactions).values({ userId: input.userId, type: input.amount >= 0 ? "addition" : "removal", amount: input.amount, description: input.description, reference, balanceAfter: balance });
+    await tx.insert(tokenTransactions).values({ userId: input.userId, operatorId: input.adminUserId, type: input.amount >= 0 ? "addition" : "removal", amount: input.amount, description: input.description, reference, balanceBefore: current?.tokenBalance ?? 0, balanceAfter: balance });
     await tx.insert(adminActions).values({ adminUserId: input.adminUserId, targetUserId: input.userId, action: input.amount >= 0 ? "add_tokens" : "remove_tokens", details: input.description, reason: input.description });
     await tx.insert(notifications).values({ userId: input.userId, title: input.amount >= 0 ? "Tokeni zimeongezwa" : "Tokeni zimeondolewa", message: `${Math.abs(input.amount)} tokeni ${input.amount >= 0 ? "zimeongezwa" : "zimeondolewa"}.`, isRead: 0 });
     return { balance, reference };
@@ -291,10 +303,10 @@ export async function getAnalytics() {
 }
 
 
-export async function saveService(input: { adminUserId: number; id?: number; slug: string; name: string; description: string; icon: string; tokenCost: number; isFree: boolean; isLocked: boolean; category: string; sortOrder: number }) {
+export async function saveService(input: { adminUserId: number; id?: number; slug: string; name: string; description: string; icon: string; tokenCost: number; isFree: boolean; isLocked: boolean; category: string; sortOrder: number; isVisible?: boolean; isFeatured?: boolean }) {
   const db = await getDb();
   if (!db) return undefined;
-  const values = { slug: input.slug, name: input.name, description: input.description, icon: input.icon, tokenCost: input.tokenCost, isFree: input.isFree ? 1 : 0, isLocked: input.isLocked ? 1 : 0, category: input.category, sortOrder: input.sortOrder };
+  const values = { slug: input.slug, name: input.name, description: input.description, icon: input.icon, tokenCost: input.tokenCost, isFree: input.isFree ? 1 : 0, isLocked: input.isLocked ? 1 : 0, category: input.category, sortOrder: input.sortOrder, isVisible: input.isVisible === false ? 0 : 1, isFeatured: input.isFeatured ? 1 : 0 };
   if (input.id) await db.update(services).set(values).where(eq(services.id, input.id));
   else await db.insert(services).values(values);
   await db.insert(adminActions).values({ adminUserId: input.adminUserId, action: input.id ? "service_update" : "service_create", details: `${input.name}`, reason: `${input.name}` });
@@ -304,7 +316,7 @@ export async function saveService(input: { adminUserId: number; id?: number; slu
 export async function deleteService(adminUserId: number, id: number, reason: string) {
   const db = await getDb();
   if (!db) return undefined;
-  await db.delete(services).where(eq(services.id, id));
+  await db.update(services).set({ isVisible: 0 }).where(eq(services.id, id));
   await db.insert(adminActions).values({ adminUserId, action: "service_delete", details: reason, reason });
   return true;
 }
@@ -363,4 +375,10 @@ export async function resetUserPin(adminUserId: number, userId: number, pinHash:
   await db.update(users).set({ pinHash, pinChangedAt: new Date(), failedLoginAttempts: 0, lockedUntil: null }).where(eq(users.id, userId));
   await db.insert(adminActions).values({ adminUserId, targetUserId: userId, action: "pin_reset", details: reason, reason });
   return true;
+}
+
+export async function hasPermission(userId: number, permissionSlug: string) {
+  const db = await getDb(); if (!db) return false;
+  const rows = await db.select({ id: userPermissions.id }).from(userPermissions).innerJoin(permissions, eq(userPermissions.permissionId, permissions.id)).where(and(eq(userPermissions.userId, userId), eq(permissions.slug, permissionSlug))).limit(1);
+  return rows.length > 0;
 }
