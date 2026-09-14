@@ -38,9 +38,19 @@ pnpm test
 pnpm build
 ```
 
+## API na GitHub Pages
+
+Frontend hutumia tRPC endpoint `POST /api/trpc/auth.login` kwa login na `POST /api/trpc/auth.register` kwa registration. Hizi si routes za HTML `/login` au `/register`. GitHub Pages ni static hosting na haiwezi kuendesha Express/tRPC; bila backend URL, request ya `/api/trpc` hurudisha HTML/405 badala ya JSON.
+
+Weka URL ya server inayotumia `server/_core/index.ts` kwenye GitHub repository variable `VITE_API_BASE_URL`, kwa mfano `https://api.example.com` bila slash ya mwisho. Workflow ya Pages huiingiza wakati wa build. Usiiweke URL ya `steward-tz.github.io` kama API URL. Kwa local development, acha variable tupu ili kutumia `/api/trpc` kwenye server ya local.
+
+Tazama `.env.example` kwa variables zinazohitajika. `DATABASE_URL`, `JWT_SECRET`, `SUPER_ADMIN_PHONE`, Forge URL na Forge key ni server-only secrets; usiziweke kwenye `VITE_*` variables wala frontend.
+
+API client hukagua `Content-Type` kabla ya kutegemea JSON. Ikiwa hosting inarudisha HTML, console huhifadhi URL/status/body preview kwa debugging na mtumiaji huona ujumbe unaodhibitiwa badala ya `Unexpected token '<'`.
+
 ## Database
 
-Schema iko `drizzle/schema.ts`. Migrations ziko `drizzle/` na migration ya production feature set ni `0004_natural_human_fly.sql`. Usibadilishe database moja kwa moja bila kuongeza schema na migration inayoweza kufuatiliwa.
+Schema iko `drizzle/schema.ts`. Migrations ziko `drizzle/` na migration ya production feature set ni `0005_production_requirements.sql`. Usibadilishe database moja kwa moja bila kuongeza schema na migration inayoweza kufuatiliwa.
 
 Tables kuu ni `users`, `roles`, `permissions`, `rolePermissions`, `userPermissions`, `services`, `serviceRuns`, `serviceUsage`, `tokenTransactions`, `messages`, `notifications`, `advertisements`, `languages`, `appearanceSettings`, `systemSettings` na `adminActions`.
 

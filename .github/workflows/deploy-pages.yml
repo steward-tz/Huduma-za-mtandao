@@ -39,6 +39,9 @@ jobs:
 
       - name: Build frontend
         working-directory: kituo-digitali
+        env:
+          # Repository variable; never use the GitHub Pages URL as the API host.
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
         run: pnpm build
 
       - name: Add SPA fallback

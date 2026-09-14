@@ -9,6 +9,8 @@ import { startLogin } from "./const";
 import "./index.css";
 
 const queryClient = new QueryClient();
+const configuredApiBase = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+const apiUrl = `${configuredApiBase}/api/trpc`;
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
@@ -40,7 +42,7 @@ queryClient.getMutationCache().subscribe(event => {
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: apiUrl,
       transformer: superjson,
       headers() {
         // Preview auto-login fallback: when the browser blocks iframe cookies
@@ -62,11 +64,27 @@ const trpcClient = trpc.createClient({
         }
         return {};
       },
-      fetch(input, init) {
-        return globalThis.fetch(input, {
+      async fetch(input, init) {
+        const response = await globalThis.fetch(input, {
           ...(init ?? {}),
           credentials: "include",
         });
+        const contentType = response.headers.get("content-type") ?? "";
+        if (!contentType.includes("application/json")) {
+          const raw = await response.text();
+          console.error("[API Non-JSON Response]", {
+            url: String(input),
+            status: response.status,
+            contentType,
+            bodyPreview: raw.slice(0, 200),
+          });
+          throw new Error(
+            response.status === 404 || response.status === 405
+              ? "API haipatikani kwenye server hii. Wasiliana na msimamizi wa mfumo."
+              : "Server imerudisha majibu yasiyo sahihi. Jaribu tena baadaye.",
+          );
+        }
+        return response;
       },
     }),
   ],
